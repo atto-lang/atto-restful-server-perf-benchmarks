@@ -20,6 +20,8 @@ ALLOWED = {
     "src/golang/gin/go.sum",
     "src/rust/axum/Cargo.lock",
     "src/erlang/phoenix/mix.lock",
+    "src/java/vertx/dependency-tree.lock",
+    "src/scala/akka/dependency-tree.lock",
 }
 if name not in ALLOWED:
     raise SystemExit(f"refusing to export non-allowlisted path: {name}")

@@ -98,6 +98,11 @@ jobs:
         run: mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
+      - name: Capture Maven Vert.x dependency graph
+        working-directory: src/java/vertx
+        run: mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock
+      - name: Export Vert.x dependency graph
+        run: python3 scripts/export_lockfile.py src/java/vertx/dependency-tree.lock
       - name: HTTP conformance (Vert.x)
         run: python3 scripts/conformance.py -- bash src/java/vertx/run.sh
   akka:
@@ -114,6 +119,11 @@ jobs:
         run: mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
+      - name: Capture Maven Akka dependency graph
+        working-directory: src/scala/akka
+        run: mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock
+      - name: Export Akka dependency graph
+        run: python3 scripts/export_lockfile.py src/scala/akka/dependency-tree.lock
       - name: HTTP conformance (Akka)
         run: python3 scripts/conformance.py -- bash src/scala/akka/run.sh
   phoenix:
