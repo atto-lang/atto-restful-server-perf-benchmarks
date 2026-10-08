@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""HTTP correctness checks; no throughput benchmark numbers are generated."""
+"""Run contract-backed HTTP conformance; this is not a performance benchmark."""
 import argparse
 import concurrent.futures
 import http.client
@@ -8,88 +8,153 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
+from jsonschema import Draft202012Validator
 
-ap = argparse.ArgumentParser(description=__doc__)
-ap.add_argument("--host", default="127.0.0.1")
-ap.add_argument("--port", type=int, default=8080)
-ap.add_argument("--timeout", type=float, default=10)
-ap.add_argument("command", nargs=argparse.REMAINDER)
-args = ap.parse_args()
-if not 1 <= args.port <= 65535: ap.error("port must be 1..65535")
+from check_contracts import CONTRACTS, load_cases
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--host", default="127.0.0.1")
+parser.add_argument("--port", type=int, default=8080)
+parser.add_argument("--target", default="unspecified")
+parser.add_argument("--timeout", type=float, default=10.0)
+parser.add_argument("command", nargs=argparse.REMAINDER)
+args = parser.parse_args()
+if not 1 <= args.port <= 65535 or args.timeout <= 0:
+    parser.error("invalid port or timeout")
 command = args.command[1:] if args.command[:1] == ["--"] else args.command
-process = None
+proc = None
 
-def request(method, path, data=None, conn=None):
-    own = conn is None
+
+def payload_for(case):
+    spec = case.get("payload")
+    if spec is None:
+        return None
+    return bytes(range(spec["byteRange"])) * spec["repeat"]
+
+
+def request(method, path, payload=None, conn=None):
+    owned = conn is None
     c = conn or http.client.HTTPConnection(args.host, args.port, timeout=args.timeout)
     try:
-        c.request(method, path, body=data, headers={"Accept-Encoding": "identity"})
+        headers = {"Accept-Encoding": "identity"}
+        if method == "POST":
+            headers["Content-Type"] = "application/octet-stream"
+        c.request(method, path, body=payload, headers=headers)
         r = c.getresponse()
-        result = (r.status, r.getheader("Content-Type", ""), r.read())
-        return result
+        raw = r.read()
+        return r.status, {k.lower(): v for k, v in r.getheaders()}, raw
     finally:
-        if own: c.close()
+        if owned:
+            c.close()
 
-def expect(method, path, status, mime=None, body=None, data=None, conn=None):
-    result = request(method, path, data, conn)
-    if result[0] != status or (mime is not None and result[1].lower() != mime.lower()) or (body is not None and result[2] != body):
-        raise AssertionError(f"{method} {path}: expected {(status,mime,body and len(body))}, got {(result[0],result[1],len(result[2]))}")
-    return result
 
-def run():
-    cases = [
-        ("GET", "/health", 200, "application/json", b'{"status":"ok"}'),
-        ("GET", "/plaintext", 200, "text/plain; charset=utf-8", b"hello, world!"),
-        ("GET", "/json", 200, "application/json", b'{"message":"hello, world!"}'),
-    ]
-    checks = 0
-    for method,path,status,mime,body in cases:
-        expect(method,path,status,mime,body)
-        checks += 1
-        if mime == "application/json": assert isinstance(json.loads(body),dict)
-    expect("GET","/not-found",404)
-    checks += 1
-    for body in (b"", bytes(range(256))*4, bytes(range(256))*256, bytes(range(256))*4096):
-        expect("POST","/echo",200,"application/octet-stream",body,body)
-        checks += 1
-    # HTTP/1.1 persistent-connection smoke: the same socket must survive.
-    conn = http.client.HTTPConnection(args.host,args.port,timeout=args.timeout)
+def verify(case, response):
+    status, headers, body = response
+    expected = case["expected"]
+    if status != expected["status"]:
+        raise AssertionError(f"{case['id']} status: {status} != {expected['status']}")
+    for key, required in expected["headers"].items():
+        actual = headers.get(key, "")
+        if actual.lower() != required.lower():
+            raise AssertionError(f"{case['id']} header {key}: {actual!r} != {required!r}")
+    spec = expected["body"]
+    if spec["kind"] == "ignore":
+        return
+    if spec["kind"] == "utf8":
+        want = spec["equals"].encode("utf-8")
+        if body != want:
+            raise AssertionError(f"{case['id']} UTF-8 body mismatch")
+    elif spec["kind"] == "json":
+        decoded = json.loads(body)
+        Draft202012Validator({"type": "object", "required": list(spec["equals"]),
+            "properties": {key: {"const": value} for key, value in spec["equals"].items()},
+            "additionalProperties": False}).validate(decoded)
+        if decoded != spec["equals"]:
+            raise AssertionError(f"{case['id']} JSON value mismatch")
+    elif spec["kind"] == "echo":
+        if body != payload_for(case):
+            raise AssertionError(f"{case['id']} binary echo mismatch {len(body)} bytes")
+    else:
+        raise AssertionError(f"unknown body mode: {spec['kind']}")
+
+
+def wait_for_server():
+    deadline = time.monotonic() + 45.0
+    while time.monotonic() < deadline:
+        if proc is not None and proc.poll() is not None:
+            raise RuntimeError(f"server exited before readiness: {proc.returncode}")
+        try:
+            code, _, body = request("GET", "/health")
+            if code == 200 and body == b'{"status":"ok"}':
+                return
+        except (OSError, http.client.HTTPException):
+            pass
+        time.sleep(0.15)
+    raise TimeoutError(f"server not ready on {args.host}:{args.port}")
+
+
+def run(cases):
+    passed = 0
+    failures = []
+    for case in cases:
+        try:
+            verify(case, request(case["method"], case["path"], payload_for(case)))
+            passed += 1
+        except Exception as exc:
+            failures.append(f"{case['id']}: {exc}")
+
+    # The same HTTP/1.1 socket must survive 3 consecutive GET responses.
+    reuse = [c for c in cases if c["id"] in ("health", "plaintext", "json")]
+    conn = http.client.HTTPConnection(args.host, args.port, timeout=args.timeout)
     try:
-        for method,path,status,mime,body in cases:
-            expect(method,path,status,mime,body,conn=conn)
-            if conn.sock is None: raise AssertionError("server closed keep-alive connection")
-            checks += 1
-    finally: conn.close()
+        for case in reuse:
+            try:
+                verify(case, request(case["method"], case["path"], conn=conn))
+                if conn.sock is None:
+                    raise AssertionError("keep-alive socket closed")
+                passed += 1
+            except Exception as exc:
+                failures.append(f"keepalive/{case['id']}: {exc}")
+                break
+    finally:
+        conn.close()
+
+    # Concurrency is a correctness smoke test, not an RPS measurement.
+    plaintext = next(c for c in cases if c["id"] == "plaintext")
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        results=list(pool.map(lambda _:request("GET","/plaintext"),range(24)))
-    for result in results:
-        if result[0] != 200 or result[1].lower() != "text/plain; charset=utf-8" or result[2] != b"hello, world!":
-            raise AssertionError(f"concurrent response mismatch: {result!r}")
-        checks += 1
-    return checks
+        future_results = list(pool.map(lambda _: request("GET", "/plaintext"), range(24)))
+    for index, response in enumerate(future_results):
+        try:
+            verify(plaintext, response)
+            passed += 1
+        except Exception as exc:
+            failures.append(f"concurrent/{index}: {exc}")
+    return passed, failures
+
 
 try:
+    cases = load_cases()["scenarios"]
     if command:
-        process=subprocess.Popen(command,env=dict(os.environ,PORT=str(args.port),HOST=args.host),stdout=subprocess.DEVNULL)
-    deadline=time.monotonic()+40
-    while True:
-        if process is not None and process.poll() is not None:
-            raise RuntimeError(f"server exited before readiness: {process.returncode}")
-        try:
-            if request("GET","/health")[0]==200: break
-        except (OSError,http.client.HTTPException):
-            pass
-        if time.monotonic()>deadline: raise TimeoutError("server readiness timeout")
-        time.sleep(0.15)
-    count=run()
-    print(json.dumps({"conformance":"passed","checks":count,"benchmarks_run":False}))
+        env = dict(os.environ, HOST=args.host, PORT=str(args.port))
+        proc = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL)
+    wait_for_server()
+    checks, failures = run(cases)
 except Exception as exc:
-    print(json.dumps({"conformance":"failed","error":str(exc),"benchmarks_run":False}),file=sys.stderr)
-    sys.exit(1)
+    checks, failures = 0, [str(exc)]
 finally:
-    if process is not None:
-        process.terminate()
-        try: process.wait(timeout=8)
+    if proc is not None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=8)
         except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=8)
+            proc.kill()
+            proc.wait(timeout=8)
+
+report = {"schema_version": 1, "target": args.target, "passed": not failures,
+          "checks": checks, "failures": failures, "benchmarks_run": False}
+result_schema = json.loads((CONTRACTS / "result.schema.json").read_text())
+Draft202012Validator(result_schema).validate(report)
+print(json.dumps(report))
+if failures:
+    sys.exit(1)
