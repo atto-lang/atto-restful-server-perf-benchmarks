@@ -1,7 +1,7 @@
 # HTTP conformance contracts
 
 * `main.tsp`: authoritative TypeSpec declarations for the four **successful API operations**, response statuses, media types, body schemas, and the 413 error case.
-* `tspconfig.yaml`, `package.json`: compile TypeSpec to OpenAPI. Run `npm install` and `npm run compile` from this folder. CI also checks that the generated OpenAPI declares exactly the four required route/method pairs.
+* `tspconfig.yaml`, `package.json`: compile TypeSpec to OpenAPI. Run `npm ci` and `npm run compile` from this folder. CI also checks that the generated OpenAPI declares exactly the four required route/method pairs.
 * `cases.json`: runtime fixtures for request bodies and expected response headers, statuses, and JSON values, plus the 404 fallback probe (not an OpenAPI route).
 * `cases.schema.json`: Draft 2020-12 JSON Schema for the fixture format.
 * `result.schema.json`: Draft 2020-12 JSON Schema for machine-readable conformance results.
@@ -13,3 +13,7 @@ The TypeSpec emitter may canonicalize Content-Type representation, and OpenAPI i
 Install Python validation dependencies: `python3 -m pip install jsonschema==4.25.1`.
 
 The generated OpenAPI is an output artifact, not something developers should hand-edit; CI checks it and ensures required contracts are present. For TypeSpec binary bodies, bytes refer to raw `application/octet-stream` bytes rather than a base64 JSON string.
+
+## Contract-hardening tests
+
+`scripts/test_contracts.py` rejects edits that weaken exact route identities, body literals, the 413 response schema, or the declared media types. `scripts/test_harness.py` tests the live runner against a known-good HTTP/1.1 fixture plus intentionally broken implementations (incorrect content type, duplicated headers, corrupt binary echo, and a preoccupied port). These black-box checks run in CI without any external server.

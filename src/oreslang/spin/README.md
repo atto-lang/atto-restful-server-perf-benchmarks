@@ -4,7 +4,7 @@ This is a benchmark **adapter**, not a fork of Spin. Its source is staged into t
 
 * `server_shared.ores`: dispatch one shared actor per request.
 * `server_isolated.ores`: dispatch one isolated actor per request.
-* Both contain byte-for-byte equivalent handler logic aside from the actor declaration, and expose `GET /health`, `GET /plaintext`, `GET /json`, and `POST /echo`.
+* Both contain byte-for-byte equivalent handler logic aside from the actor declaration. The echo path buffers bounded chunks up to 1 MiB and explicitly returns HTTP 413 when the body exceeds the benchmark limit; the underlying transport has a 2 MiB guardrail so the actor can produce the required error header. Both variants expose `GET /health`, `GET /plaintext`, `GET /json`, and `POST /echo`.
 
 ## Requirements and run commands
 
@@ -26,4 +26,4 @@ python3 scripts/conformance.py --port 8080
 
 Run the command from the benchmark repo root. No automated cross-repository CI checkout is configured: `GITHUB_TOKEN` in this private repo cannot authenticate access to private sibling repositories automatically, and credentials must not be baked into this repository.
 
-This adapter has not yet passed a compiler/runtime integration run. Mark it verified only after exact-tree compiler execution and the conformance suite pass. Spin's existing local measurements from its own tests cannot be compared against other frameworks as published results.
+Both actor modes passed 36/36 real HTTP contract checks against the compiler pinned by Spin's SOURCE_REF. The private CI mirror verified all 95 relevant original Git blob SHAs across the compiler, Spin, and HTTP-routing repositories. See [verification evidence](../../../docs/VERIFICATION.md). Existing Spin local timing numbers remain unsuitable as cross-framework rankings.

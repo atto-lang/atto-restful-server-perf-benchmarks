@@ -12,10 +12,10 @@ All test servers listen on `127.0.0.1:${PORT}` unless the runner explicitly sets
 | `GET /plaintext` | `200` / `hello, world!` | `text/plain; charset=utf-8` |
 | `GET /json` | `200` / `{"message":"hello, world!"}` | `application/json` |
 | `POST /echo` (0–1 MiB) | `200` / byte-for-byte copy of request body | `application/octet-stream` |
-| `POST /echo` (1 MiB + 256 B) | `413` / framework-specific error body | implementation-defined |
+| `POST /echo` (1 MiB + 256 B) | `413` / error body implementation-defined | `text/plain; charset=utf-8` |
 | `GET /not-found` | `404`; record body but do not include in throughput results | implementation-defined |
 
-Conformance must verify the exact UTF-8 / binary response bodies and status codes; accept equivalent JSON semantics if an implementation uses another valid serialization with different key order (the simple fixed fixtures currently have none). For `POST /echo`, check empty, 1 KiB, 64 KiB, and 1 MiB payloads, plus rejection at 1 MiB + 256 B with NUL/non-ASCII bytes; reject silent truncation. Do not quietly substitute text encoding for binary copying.
+Conformance must verify the exact UTF-8 / binary response bodies and status codes; accept equivalent JSON semantics if an implementation uses another valid serialization with different key order (the simple fixed fixtures currently have none). For `POST /echo`, check empty, 1 KiB, 64 KiB, 1 MiB, and 1 MiB + 256 B (413 rejection) with NUL/non-ASCII bytes; reject silent truncation. Do not quietly substitute text encoding for binary copying.
 
 ## Measurement matrix (proposed defaults)
 
@@ -47,7 +47,7 @@ The existing [Spin benchmark notes](https://github.com/ores-truffle-oreslang/ore
 ## Implementation notes (first tranche)
 
 * The Node.js server uses the built-in `node:http` implementation; it is a runtime baseline rather than an Express/Fastify framework benchmark.
-* Node.js, Gin, and Axum buffer `POST /echo` request bodies with a 1 MiB maximum. The Spin implementation presently streams bounded chunks from the HTTP capability; this is a **known workload-implementation difference**, so echo latency comparisons must be labeled accordingly or revised for semantic parity.
+* Node.js, Gin, and Axum buffer `POST /echo` request bodies with a 1 MiB maximum. The Spin implementation now buffers bounded chunks up to 1 MiB before responding (with an HTTP 413 response on overflow). Its response is emitted in buffered chunks, rather than one contiguous output buffer, so allocator and transport-stage differences remain; report them explicitly.
 * Spin's draft server currently binds to 127.0.0.1:8080. The `run.sh` adapter rejects alternate ports until a verified Oreslang environmental-port API is available. The other targets accept `HOST` and `PORT`.
 * Only conformance (not performance rankings) is run in automated CI. Benchmark samples require a controlled environment and results with full provenance.
 
@@ -57,3 +57,14 @@ The existing [Spin benchmark notes](https://github.com/ores-truffle-oreslang/ore
 * `scala-akka`: Scala 2.13.17, Akka HTTP 10.2.10 / Akka Stream 2.6.20 (the Maven-Central-available legacy Apache 2.0 licensing line). Maven Scala compiler; bounded strict request body.
 * `erlang-phoenix`: Elixir 1.18.4 and OTP 27.3 CI, Phoenix 1.8.15 on Bandit 1.12.5. Minimal Phoenix.Endpoint/Phoenix.Router/Plug.Conn; one MiB binary body.
 * Different HTTP implementations may have different HTTP parsing, connection handling, runtime scheduler, and request body internals. Preserve the contracts, log the exact versions and adapter choices, and label comparisons carefully.
+
+## Additional adapters: source implemented, runtime verification pending
+
+* Bun and Deno use native HTTP runtime APIs. Node handler mocks cannot prove their native HTTP/1.1 behavior.
+* Spring Boot 3.5.6 runs embedded Tomcat.
+* Gorilla/mux 1.8.1 runs on Go net/http.
+* Erlang/OTP uses Cowboy 2.13.0 / Ranch as the HTTP transport.
+* Actix Web 4.15.0 is a Rust HTTP server.
+* Ractor 0.16.5 uses Axum 0.8.9 for transport; it measures actor dispatch plus Axum, not a standalone Ractor HTTP implementation.
+
+These seven targets remain `implemented` until independently verified, while first-wave CI evidence is retained. The canonical HTTP 413 response media type remains `text/plain; charset=utf-8`. Whitespace around MIME parameters is semantically insignificant.

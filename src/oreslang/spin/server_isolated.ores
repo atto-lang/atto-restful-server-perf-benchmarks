@@ -13,13 +13,27 @@ define isoactor BenchmarkHandler as
     elif request.operation_id == "json"; then
       await request.respond(200, "application/json", "{\"message\":\"hello, world!\"}");
     elif request.operation_id == "echo"; then
-      await request.start(200, "application/octet-stream");
+      // Buffer bounded chunks before answering, like the other server targets.
+      // An oversize body must use the same explicit 413 error envelope.
+      val Array<Array<int>> chunks = new Array<Array<int>>();
+      let int total = 0;
       loop {
         val Array<int> chunk = await request.read_chunk(16384);
         if chunk.size == 0; then break; fi
-        await request.write_bytes(chunk);
+        total = total + chunk.size;
+        if total <= 1048576; then
+          chunks.add(chunk);
+        fi
       }
-      await request.finish();
+      if total > 1048576; then
+        await request.respond(413, "text/plain; charset=utf-8", "Payload Too Large");
+      else
+        await request.start(200, "application/octet-stream");
+        for (const chunk of chunks) {
+          await request.write_bytes(chunk);
+        }
+        await request.finish();
+      fi
     else
       await request.respond(500, "text/plain; charset=utf-8", "Unexpected operation");
     fi
@@ -39,7 +53,7 @@ pub async routine main(): void {
   builder.route("GET", rt borrow json, http.handler("BenchmarkHandler"), 0, 0, "json").unwrap();
   builder.route("POST", rt borrow echo, http.handler("BenchmarkHandler"), 0, 0, "echo").unwrap();
   val app = builder.build().unwrap();
-  val server = http.listen("127.0.0.1", 8080, 128, 1048576, 30000);
+  val server = http.listen("127.0.0.1", 8080, 128, 2097152, 30000);
   stdio.println(server.port);
   loop {
     val request = await server.accept();

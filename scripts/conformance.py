@@ -3,8 +3,11 @@
 import argparse
 import concurrent.futures
 import http.client
+import hashlib
 import json
 import os
+import signal
+import socket
 import subprocess
 import sys
 import time
@@ -42,8 +45,24 @@ def request(method, path, payload=None, conn=None):
             headers["Content-Type"] = "application/octet-stream"
         c.request(method, path, body=payload, headers=headers)
         r = c.getresponse()
+        if r.version != 11:
+            raise AssertionError(f"{method} {path}: expected HTTP/1.1, got {r.version}")
+        pairs = r.getheaders()
+        for unique in ("content-type", "content-length", "transfer-encoding"):
+            if sum(name.lower() == unique for name, _ in pairs) > 1:
+                raise AssertionError(f"{method} {path}: duplicate {unique} response header")
+        headers_out = {k.lower(): v for k, v in pairs}
+        if "content-length" in headers_out and "transfer-encoding" in headers_out:
+            raise AssertionError(f"{method} {path}: ambiguous response framing")
         raw = r.read()
-        return r.status, {k.lower(): v for k, v in r.getheaders()}, raw
+        if "content-length" in headers_out:
+            try:
+                claimed = int(headers_out["content-length"])
+            except ValueError as exc:
+                raise AssertionError(f"{method} {path}: invalid Content-Length") from exc
+            if claimed < 0 or claimed != len(raw):
+                raise AssertionError(f"{method} {path}: Content-Length/body mismatch")
+        return r.status, headers_out, raw
     finally:
         if owned:
             c.close()
@@ -56,12 +75,10 @@ def verify(case, response):
         raise AssertionError(f"{case['id']} status: {status} != {expected['status']}")
     for key, required in expected["headers"].items():
         actual = headers.get(key, "")
-        # HTTP media-type parameter whitespace is insignificant. Servlet
-        # containers often emit text/plain;charset=utf-8 instead of the
-        # semantically identical text/plain; charset=utf-8.
+        # MIME parameter whitespace is insignificant (e.g., Spring's charset form).
         if key == "content-type":
-            actual_normal = ";".join(x.strip().lower() for x in actual.split(";"))
-            required_normal = ";".join(x.strip().lower() for x in required.split(";"))
+            actual_normal = ";".join(part.strip().lower() for part in actual.split(";"))
+            required_normal = ";".join(part.strip().lower() for part in required.split(";"))
         else:
             actual_normal = actual.lower()
             required_normal = required.lower()
@@ -132,36 +149,63 @@ def run(cases):
     # Concurrency is a correctness smoke test, not an RPS measurement.
     plaintext = next(c for c in cases if c["id"] == "plaintext")
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        future_results = list(pool.map(lambda _: request("GET", "/plaintext"), range(24)))
-    for index, response in enumerate(future_results):
-        try:
-            verify(plaintext, response)
-            passed += 1
-        except Exception as exc:
-            failures.append(f"concurrent/{index}: {exc}")
+        futures = [pool.submit(request, "GET", "/plaintext") for _ in range(24)]
+        for index, future in enumerate(futures):
+            try:
+                verify(plaintext, future.result())
+                passed += 1
+            except Exception as exc:
+                failures.append(f"concurrent/{index}: {exc}")
     return passed, failures
 
 
 try:
     cases = load_cases()["scenarios"]
     if command:
+        # Fail closed if another server already occupies this endpoint.
+        # Otherwise a broken child process could get credit for its responses.
+        try:
+            existing = socket.create_connection((args.host, args.port), timeout=0.5)
+        except ConnectionRefusedError:
+            pass
+        else:
+            existing.close()
+            raise RuntimeError(f"refusing to run: {args.host}:{args.port} already accepts connections")
         env = dict(os.environ, HOST=args.host, PORT=str(args.port))
-        proc = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL)
+        proc = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL,
+                                start_new_session=(os.name == "posix"))
     wait_for_server()
     checks, failures = run(cases)
 except Exception as exc:
     checks, failures = 0, [str(exc)]
 finally:
     if proc is not None:
-        proc.terminate()
+        # Kill the entire server process group, not only the bash/mix wrapper.
+        # This prevents a stale server making the next conformance run appear green.
+        try:
+            if os.name == "posix":
+                os.killpg(proc.pid, signal.SIGTERM)
+            else:
+                proc.terminate()
+        except ProcessLookupError:
+            pass
         try:
             proc.wait(timeout=8)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            if os.name == "posix":
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            else:
+                proc.kill()
             proc.wait(timeout=8)
 
+# Hash the cases actually used by this run, not the generated OpenAPI.
+fixture_hash = hashlib.sha256((CONTRACTS / "cases.json").read_bytes()).hexdigest()
 report = {"schema_version": 1, "target": args.target, "passed": not failures,
-          "checks": checks, "failures": failures, "benchmarks_run": False}
+          "checks": checks, "failures": failures, "benchmarks_run": False,
+          "contract_sha256": fixture_hash}
 result_schema = json.loads((CONTRACTS / "result.schema.json").read_text())
 Draft202012Validator(result_schema).validate(report)
 print(json.dumps(report))

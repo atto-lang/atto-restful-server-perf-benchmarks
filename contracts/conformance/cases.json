@@ -135,7 +135,20 @@
       }
     },
     {
-      "id": "echo-over-limit",
+      "id": "not-found",
+      "method": "GET",
+      "path": "/not-found",
+      "inOpenApi": false,
+      "expected": {
+        "status": 404,
+        "headers": {},
+        "body": {
+          "kind": "ignore"
+        }
+      }
+    },
+    {
+      "id": "echo-too-large",
       "method": "POST",
       "path": "/echo",
       "inOpenApi": true,
@@ -146,20 +159,9 @@
       },
       "expected": {
         "status": 413,
-        "headers": {},
-        "body": {
-          "kind": "ignore"
-        }
-      }
-    },
-    {
-      "id": "not-found",
-      "method": "GET",
-      "path": "/not-found",
-      "inOpenApi": false,
-      "expected": {
-        "status": 404,
-        "headers": {},
+        "headers": {
+          "content-type": "text/plain; charset=utf-8"
+        },
         "body": {
           "kind": "ignore"
         }
