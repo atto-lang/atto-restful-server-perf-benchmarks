@@ -22,20 +22,26 @@ function reply(status, type, body) {
 }
 
 async function readBody(request) {
-  if (!request.body) return new Uint8Array(0);
+  if (!request.body) {
+    return new Uint8Array(0);
+  }
   const reader = request.body.getReader();
   const parts = [];
   let size = 0;
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        break;
+      }
       size += value.byteLength;
       if (size > MAX_BODY) {
         await reader.cancel().catch(() => {});
         return null;
       }
-      parts.push(value);
+      // Own every chunk: a streaming producer may reuse a previous buffer.
+      // Retaining a view would silently corrupt the byte-for-byte echo.
+      parts.push(new Uint8Array(value));
     }
   } finally {
     reader.releaseLock();
