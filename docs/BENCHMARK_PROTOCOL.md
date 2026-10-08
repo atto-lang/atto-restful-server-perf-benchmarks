@@ -42,3 +42,10 @@ Conformance must verify the exact UTF-8 / binary response bodies and status code
 The future runner should write immutable machine-readable trial files to `results/` with at least `target_id`, `source_sha`, `environment`, `scenario`, `concurrency`, `connections`, `warmup_seconds`, `measurement_seconds`, `trial`, `requests_ok`, `errors`, `throughput_rps`, `latency_ms` (p50/p95/p99), `cpu`, and `rss_bytes`. No fabricated or missing samples should be converted to zeroes. Aggregates should reference raw trial data and include dispersion/confidence intervals.
 
 The existing [Spin benchmark notes](https://github.com/ores-truffle-oreslang/oreslang-spin/blob/main/docs/BENCHMARK.md) are historical context, not cross-language evidence.
+
+## Implementation notes (first tranche)
+
+* The Node.js server uses the built-in `node:http` implementation; it is a runtime baseline rather than an Express/Fastify framework benchmark.
+* Node.js, Gin, and Axum buffer `POST /echo` request bodies with a 1 MiB maximum. The Spin implementation presently streams bounded chunks from the HTTP capability; this is a **known workload-implementation difference**, so echo latency comparisons must be labeled accordingly or revised for semantic parity.
+* Spin's draft server currently binds to 127.0.0.1:8080. The `run.sh` adapter rejects alternate ports until a verified Oreslang environmental-port API is available. The other targets accept `HOST` and `PORT`.
+* Only conformance (not performance rankings) is run in automated CI. Benchmark samples require a controlled environment and results with full provenance.
