@@ -26,6 +26,10 @@ jobs:
           python3 -m pip install --user jsonschema==4.25.1
           python3 scripts/check_contracts.py --openapi contracts/conformance/generated/openapi.json
           python3 -m unittest discover -s scripts -p 'test_contracts.py' -v
+      - name: Export checked TypeSpec lock and emitted OpenAPI
+        run: |
+          python3 scripts/export_lockfile.py contracts/conformance/package-lock.json
+          python3 scripts/export_lockfile.py contracts/conformance/generated/openapi.json
   layout:
     runs-on: ubuntu-latest
     steps:
@@ -57,6 +61,10 @@ jobs:
         run: |
           go mod tidy
           go build -o server .
+      - name: Export resolved Go lock
+        run: |
+          python3 scripts/export_lockfile.py src/golang/gin/go.mod
+          python3 scripts/export_lockfile.py src/golang/gin/go.sum
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
       - run: python3 scripts/conformance.py -- ./src/golang/gin/server
@@ -68,6 +76,8 @@ jobs:
       - name: Build
         working-directory: src/rust/axum
         run: cargo build --release
+      - name: Export Cargo lock
+        run: python3 scripts/export_lockfile.py src/rust/axum/Cargo.lock
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
       - run: python3 scripts/conformance.py -- ./src/rust/axum/target/release/oreslang-benchmark-axum
@@ -120,6 +130,8 @@ jobs:
           mix local.rebar --force
           mix deps.get
           mix compile
+      - name: Export Mix lock
+        run: python3 scripts/export_lockfile.py src/erlang/phoenix/mix.lock
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
       - name: HTTP conformance (Phoenix)
