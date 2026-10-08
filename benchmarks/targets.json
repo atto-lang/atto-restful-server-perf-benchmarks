@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "description": "Implementation inventory; status=scaffold means no executable benchmark candidate yet",
+  "spin_upstream": {
+    "repository": "ores-truffle-oreslang/oreslang-spin",
+    "commit": "8f29b2f75f13beb3e03357e6b15839129c33d72b"
+  },
+  "targets": [
+    {
+      "id": "js-nodejs",
+      "path": "src/js/nodejs",
+      "ecosystem": "js",
+      "implementation": "Node.js",
+      "kind": "runtime",
+      "status": "scaffold"
+    },
+    {
+      "id": "js-bun",
+      "path": "src/js/bun",
+      "ecosystem": "js",
+      "implementation": "Bun",
+      "kind": "runtime",
+      "status": "scaffold"
+    },
+    {
+      "id": "js-deno",
+      "path": "src/js/deno",
+      "ecosystem": "js",
+      "implementation": "Deno",
+      "kind": "runtime",
+      "status": "scaffold"
+    },
+    {
+      "id": "java-vertx",
+      "path": "src/java/vertx",
+      "ecosystem": "java",
+      "implementation": "Vert.x",
+      "kind": "framework",
+      "status": "scaffold"
+    },
+    {
+      "id": "java-springboot",
+      "path": "src/java/springboot",
+      "ecosystem": "java",
+      "implementation": "Spring Boot",
+      "kind": "framework",
+      "status": "scaffold"
+    },
+    {
+      "id": "golang-gin",
+      "path": "src/golang/gin",
+      "ecosystem": "golang",
+      "implementation": "Gin",
+      "kind": "framework",
+      "status": "scaffold"
+    },
+    {
+      "id": "golang-mux",
+      "path": "src/golang/mux",
+      "ecosystem": "golang",
+      "implementation": "Gorilla/mux",
+      "kind": "router",
+      "status": "scaffold"
+    },
+    {
+      "id": "scala-akka",
+      "path": "src/scala/akka",
+      "ecosystem": "scala",
+      "implementation": "Akka HTTP",
+      "kind": "framework",
+      "status": "scaffold"
+    },
+    {
+      "id": "erlang-otp",
+      "path": "src/erlang/otp",
+      "ecosystem": "erlang",
+      "implementation": "Erlang/OTP",
+      "kind": "runtime",
+      "status": "scaffold"
+    },
+    {
+      "id": "erlang-phoenix",
+      "path": "src/erlang/phoenix",
+      "ecosystem": "erlang",
+      "implementation": "Phoenix (Elixir/BEAM)",
+      "kind": "framework",
+      "status": "scaffold"
+    },
+    {
+      "id": "rust-axum",
+      "path": "src/rust/axum",
+      "ecosystem": "rust",
+      "implementation": "Axum",
+      "kind": "framework",
+      "status": "scaffold"
+    },
+    {
+      "id": "rust-actix",
+      "path": "src/rust/actix",
+      "ecosystem": "rust",
+      "implementation": "Actix Web",
+      "kind": "framework",
+      "status": "scaffold"
+    },
+    {
+      "id": "rust-ractor",
+      "path": "src/rust/ractor",
+      "ecosystem": "rust",
+      "implementation": "Ractor with HTTP adapter (TBD)",
+      "kind": "actor-framework",
+      "status": "scaffold"
+    },
+    {
+      "id": "oreslang-spin",
+      "path": "src/oreslang/spin",
+      "ecosystem": "oreslang",
+      "implementation": "Oreslang Spin",
+      "kind": "baseline",
+      "status": "scaffold"
+    }
+  ]
+}
