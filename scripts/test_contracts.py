@@ -3,13 +3,13 @@
 import copy
 import unittest
 
-from check_contracts import REQUIRED, load_cases, check_openapi
+from check_contracts import REQUIRED, load_cases, check_openapi, validate_fixture_semantics, CONTRACTS
 
 
 class ContractTests(unittest.TestCase):
     def test_load_cases(self):
         cases = load_cases()
-        self.assertEqual(len(cases["scenarios"]), 8)
+        self.assertEqual(len(cases["scenarios"]), 9)
 
     def test_required_routes(self):
         self.assertEqual(set(REQUIRED), {
@@ -35,6 +35,47 @@ class ContractTests(unittest.TestCase):
         cases = {c["id"]: c for c in load_cases()["scenarios"]}
         self.assertEqual(cases["health"]["expected"]["body"]["equals"], {"status": "ok"})
         self.assertEqual(cases["json"]["expected"]["body"]["equals"], {"message": "hello, world!"})
+
+
+    def test_fixture_cannot_weaken_json_literal(self):
+        cases = copy.deepcopy(load_cases())
+        cases["scenarios"][0]["expected"]["body"]["equals"]["status"] = "ready"
+        with self.assertRaisesRegex(ValueError, "payload literal"):
+            validate_fixture_semantics(cases)
+
+    def test_fixture_cannot_swap_routes(self):
+        cases = copy.deepcopy(load_cases())
+        cases["scenarios"][0]["path"] = "/json"
+        with self.assertRaisesRegex(ValueError, "fixture drift"):
+            validate_fixture_semantics(cases)
+
+    def test_fixture_cannot_skip_oversized_body(self):
+        cases = copy.deepcopy(load_cases())
+        target = next(c for c in cases["scenarios"] if c["id"] == "echo-too-large")
+        target["payload"]["repeat"] = 4096
+        with self.assertRaisesRegex(ValueError, "binary boundary"):
+            validate_fixture_semantics(cases)
+
+    def test_openapi_requires_413_media_type(self):
+        import json
+        doc = json.loads((CONTRACTS / "generated/openapi.json").read_text())
+        doc["paths"]["/echo"]["post"]["responses"]["413"]["content"] = {}
+        with self.assertRaisesRegex(ValueError, "413"):
+            check_openapi(doc)
+
+    def test_openapi_requires_plaintext_literal(self):
+        import json
+        doc = json.loads((CONTRACTS / "generated/openapi.json").read_text())
+        doc["paths"]["/plaintext"]["get"]["responses"]["200"]["content"]["text/plain; charset=utf-8"]["schema"]["enum"] = ["different"]
+        with self.assertRaisesRegex(ValueError, "plaintext"):
+            check_openapi(doc)
+
+    def test_openapi_rejects_unexpected_status(self):
+        import json
+        doc = json.loads((CONTRACTS / "generated/openapi.json").read_text())
+        doc["paths"]["/health"]["get"]["responses"]["201"] = {"description": "Created"}
+        with self.assertRaisesRegex(ValueError, "status codes"):
+            check_openapi(doc)
 
 
 if __name__ == "__main__":

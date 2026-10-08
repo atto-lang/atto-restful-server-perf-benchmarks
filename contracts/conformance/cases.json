@@ -146,6 +146,26 @@
           "kind": "ignore"
         }
       }
+    },
+    {
+      "id": "echo-too-large",
+      "method": "POST",
+      "path": "/echo",
+      "inOpenApi": true,
+      "payload": {
+        "kind": "binary-pattern",
+        "byteRange": 256,
+        "repeat": 4097
+      },
+      "expected": {
+        "status": 413,
+        "headers": {
+          "content-type": "text/plain; charset=utf-8"
+        },
+        "body": {
+          "kind": "ignore"
+        }
+      }
     }
   ]
 }

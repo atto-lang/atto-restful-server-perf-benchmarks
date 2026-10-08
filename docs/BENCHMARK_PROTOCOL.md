@@ -12,6 +12,7 @@ All test servers listen on `127.0.0.1:${PORT}` unless the runner explicitly sets
 | `GET /plaintext` | `200` / `hello, world!` | `text/plain; charset=utf-8` |
 | `GET /json` | `200` / `{"message":"hello, world!"}` | `application/json` |
 | `POST /echo` | `200` / byte-for-byte copy of request body | `application/octet-stream` |
+| `POST /echo` with a body above 1 MiB | `413` / error body implementation-defined | `text/plain; charset=utf-8` |
 | `GET /not-found` | `404`; record body but do not include in throughput results | implementation-defined |
 
 Conformance must verify the exact UTF-8 / binary response bodies and status codes; accept equivalent JSON semantics if an implementation uses another valid serialization with different key order (the simple fixed fixtures currently have none). For `POST /echo`, check empty, 1 KiB, and 64 KiB payloads with NUL/non-ASCII bytes; reject silent truncation. Do not quietly substitute text encoding for binary copying.
@@ -46,7 +47,7 @@ The existing [Spin benchmark notes](https://github.com/ores-truffle-oreslang/ore
 ## Implementation notes (first tranche)
 
 * The Node.js server uses the built-in `node:http` implementation; it is a runtime baseline rather than an Express/Fastify framework benchmark.
-* Node.js, Gin, and Axum buffer `POST /echo` request bodies with a 1 MiB maximum. The Spin implementation presently streams bounded chunks from the HTTP capability; this is a **known workload-implementation difference**, so echo latency comparisons must be labeled accordingly or revised for semantic parity.
+* Node.js, Gin, and Axum buffer `POST /echo` request bodies with a 1 MiB maximum. The Spin implementation now buffers bounded chunks up to 1 MiB before responding (with an HTTP 413 response on overflow). Its response is emitted in buffered chunks, rather than one contiguous output buffer, so allocator and transport-stage differences remain; report them explicitly.
 * Spin's draft server currently binds to 127.0.0.1:8080. The `run.sh` adapter rejects alternate ports until a verified Oreslang environmental-port API is available. The other targets accept `HOST` and `PORT`.
 * Only conformance (not performance rankings) is run in automated CI. Benchmark samples require a controlled environment and results with full provenance.
 

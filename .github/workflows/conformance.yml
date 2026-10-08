@@ -17,7 +17,7 @@ jobs:
           node-version: "22"
       - name: Install TypeSpec
         working-directory: contracts/conformance
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Emit OpenAPI from TypeSpec
         working-directory: contracts/conformance
         run: npm run compile
@@ -25,7 +25,9 @@ jobs:
         run: |
           python3 -m pip install --user jsonschema==4.25.1
           python3 scripts/check_contracts.py --openapi contracts/conformance/generated/openapi.json
+          git diff --exit-code -- contracts/conformance/generated/openapi.json contracts/conformance/package-lock.json
           python3 -m unittest discover -s scripts -p 'test_contracts.py' -v
+          python3 -m unittest discover -s scripts -p 'test_harness.py' -v
   layout:
     runs-on: ubuntu-latest
     steps:
@@ -55,8 +57,9 @@ jobs:
       - name: Build
         working-directory: src/golang/gin
         run: |
-          go mod tidy
-          go build -o server .
+          go mod download
+          go build -mod=readonly -o server .
+          git diff --exit-code -- go.mod go.sum
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
       - run: python3 scripts/conformance.py -- ./src/golang/gin/server
@@ -67,7 +70,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Build
         working-directory: src/rust/axum
-        run: cargo build --release
+        run: cargo build --release --locked
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
       - run: python3 scripts/conformance.py -- ./src/rust/axum/target/release/oreslang-benchmark-axum
@@ -86,6 +89,11 @@ jobs:
         run: mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
+      - name: Capture Maven Vert.x dependency graph
+        working-directory: src/java/vertx
+        run: |
+          mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock
+          git diff --exit-code -- dependency-tree.lock
       - name: HTTP conformance (Vert.x)
         run: python3 scripts/conformance.py -- bash src/java/vertx/run.sh
   akka:
@@ -102,6 +110,11 @@ jobs:
         run: mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
+      - name: Capture Maven Akka dependency graph
+        working-directory: src/scala/akka
+        run: |
+          mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock
+          git diff --exit-code -- dependency-tree.lock
       - name: HTTP conformance (Akka)
         run: python3 scripts/conformance.py -- bash src/scala/akka/run.sh
   phoenix:
@@ -118,12 +131,13 @@ jobs:
         run: |
           mix local.hex --force
           mix local.rebar --force
-          mix deps.get
+          mix deps.get --check-locked
           mix compile
+          git diff --exit-code -- mix.lock
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
       - name: HTTP conformance (Phoenix)
         run: python3 scripts/conformance.py -- bash src/erlang/phoenix/run.sh
 
-# Spin requires authenticated checkout of private upstream trees and pinned compiler;
-# source equivalence above is not sufficient to claim runtime conformance.
+# Spin runtime validated separately via a private, exact Git-blob CI mirror.
+# See docs/VERIFICATION.md. Local source parity is not runtime proof.

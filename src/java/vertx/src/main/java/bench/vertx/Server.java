@@ -49,6 +49,19 @@ public final class Server {
           }
           ctx.response().setStatusCode(200).putHeader("Content-Type", "application/octet-stream").end(body);
         });
+    // BodyHandler reports a 413 failure without a Content-Type by default.
+    // Normalize the error envelope to the shared conformance contract.
+    router.route().failureHandler(ctx -> {
+      if (ctx.response().ended()) {
+        return;
+      }
+      if (ctx.statusCode() == 413) {
+        respond(ctx, 413, "text/plain; charset=utf-8", "Payload Too Large");
+      } else {
+        respond(ctx, 500, "text/plain; charset=utf-8", "Internal Server Error");
+      }
+    });
+
     // No logging/session/cookie middleware. Router preserves HTTP/1.1 keep-alive.
     router.route().handler(ctx ->
         respond(ctx, 404, "text/plain; charset=utf-8", "Not Found"));

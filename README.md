@@ -2,7 +2,7 @@
 
 Reproducible HTTP-server comparisons of [Oreslang Spin](https://github.com/ores-truffle-oreslang/oreslang-spin) against JavaScript, JVM, Go, Rust, and BEAM frameworks.
 
-**Status:** implementations are being added and verified; no cross-language benchmark rankings have been generated. Spin is a draft HTTP/1.1 framework and its existing local benchmark is not a cross-framework performance result.
+**Status:** seven initial target implementations verified (six non-Spin servers plus Spin shared/isolated actor modes). This is HTTP correctness verification, not a published performance ranking.
 
 ## Implementations
 
@@ -48,7 +48,7 @@ See [docs/BENCHMARK_PROTOCOL.md](docs/BENCHMARK_PROTOCOL.md) for validity criter
 
 Spin source: https://github.com/ores-truffle-oreslang/oreslang-spin
 
-The upstream repo currently provides `scripts/benchmark.py`, `tests/server.ores`, and `docs/BENCHMARK.md`. Its initial localhost test creates a **new HTTP/1.1 connection per request** and measures shared and isolated actor paths that have different handler implementations. That result is *not* directly comparable to a keep-alive benchmark in another language. The adapter under `src/oreslang/spin` will eventually run the **same contract** as every other candidate while recording the exact upstream source/compiler pins.
+The upstream repo currently provides `scripts/benchmark.py`, `tests/server.ores`, and `docs/BENCHMARK.md`. Its initial localhost test creates a **new HTTP/1.1 connection per request** and measures shared and isolated actor paths that have different handler implementations. That result is *not* directly comparable to a keep-alive benchmark in another language. The adapter under `src/oreslang/spin` now runs the **same contract** (including 413 errors) in shared and isolated modes, with exact pinned upstream sources verified in a private CI mirror.
 
 ## Next work
 
@@ -57,9 +57,9 @@ The upstream repo currently provides `scripts/benchmark.py`, `tests/server.ores`
 3. Add a runner that captures hardware/software provenance and repeatable, machine-readable results.
 4. Run separate persistent-connection and new-connection HTTP/1.1 suites, then publish validated results with complete raw data.
 
-## First implemented servers (not yet verified)
+## Verified first-wave servers
 
-The Node.js, Gin, and Axum implementations and the two Spin actor-mode adapters expose the common four endpoints. Conformance tests must pass before these become verified targets. The CI tests correctness, not performance.
+Node.js, Gin, Axum, Vert.x, Akka HTTP, Phoenix, and both Spin actor modes passed all 36 contract checks. CI tests correctness, not performance. See [verified test evidence](docs/VERIFICATION.md).
 
 ```bash
 python3 scripts/conformance.py -- node src/js/nodejs/server.mjs
@@ -71,7 +71,7 @@ python3 scripts/conformance.py -- ./src/rust/axum/target/release/oreslang-benchm
 
 Spin requires local private pinned compiler/framework checkouts; see [its adapter README](src/oreslang/spin/README.md).
 
-**Known gaps:** Pin transitive dependency locks (`go.sum`, `Cargo.lock`) after validated resolution; compile and run Spin against its exact upstream tree; make Spin's echo body buffering equivalent to the other three before measuring echo latency. Do not publish rankings from incomplete or unverified comparisons.
+**Remaining benchmark work:** establish controlled load generation, worker and connection-mode parity, repeated warmups, raw result provenance, and resource profiles. Spin buffers its echo input in bounded chunks, with a different output transport strategy; disclose this when comparing echo results. No throughput rankings have been produced.
 
 ## JVM and BEAM benchmark targets
 
@@ -83,20 +83,20 @@ The following source targets are implemented and have their own conformance jobs
 | Akka HTTP 10.2.10 | `src/scala/akka` | same Maven command from its own directory | `bash src/scala/akka/run.sh` |
 | Phoenix 1.8.15 / Bandit 1.12.5 | `src/erlang/phoenix` | `mix deps.get && mix compile` from its own directory | `bash src/erlang/phoenix/run.sh` |
 
-Run the shared `python3 scripts/conformance.py -- bash .../run.sh` command after building. The Akka target deliberately uses the older Apache-2 licensed libraries that resolve from Maven Central; do not label it the current licensed Akka stack. Phoenix is an Elixir implementation on BEAM, not an Erlang-only program. Commit generated dependency locks after successful resolution to make the next results reproducible.
+Run the shared `python3 scripts/conformance.py -- bash .../run.sh` command after building. The Akka target deliberately uses the older Apache-2 licensed libraries that resolve from Maven Central; do not label it the current licensed Akka stack. Phoenix is an Elixir implementation on BEAM, not an Erlang-only program. The Mix lockfile and Maven dependency snapshots are checked in and validated in CI.
 
 ## Schema-driven conformance
 
 `contracts/conformance/main.tsp` is the TypeSpec HTTP API with four explicit required routes and response status/Content-Type/body declarations. The CI `contracts` job emits OpenAPI and checks that none of the four methods or the expected response contracts were omitted.
 
-`contracts/conformance/cases.json` describes eight cases, including the fallback 404, four byte-exact echo payload sizes, the 1 MiB boundary, JSON literals, required headers, and status codes. Draft 2020-12 schemas validate this fixture file and the machine-readable test results. Each runnable server executes these fixtures plus keep-alive and 24 concurrent requests (35 total checks).
+`contracts/conformance/cases.json` describes nine cases, including the fallback 404, four byte-exact valid echo payload sizes plus a 413 over-limit case, the 1 MiB boundary, JSON literals, required headers, and status codes. Draft 2020-12 schemas validate this fixture file and the machine-readable test results. Each runnable server executes these fixtures plus keep-alive and 24 concurrent requests (36 total checks).
 
 ```bash
-(cd contracts/conformance && npm install --no-audit --no-fund && npm run compile)
+(cd contracts/conformance && npm ci --no-audit --no-fund && npm run compile)
 python3 -m pip install jsonschema==4.25.1
 python3 scripts/check_contracts.py --openapi contracts/conformance/generated/openapi.json
 python3 -m unittest discover -s scripts -p 'test_contracts.py' -v
 python3 scripts/conformance.py --target js-nodejs -- node src/js/nodejs/server.mjs
 ```
 
-Until transitive lockfiles are committed, direct dependencies are pinned but npm/Maven/Go/Mix/Cargo dependency resolution has known reproducibility gaps. Benchmarks must not be published based on conformance pass rates alone.
+TypeSpec npm, Rust Cargo, Go modules, and Phoenix Mix now have committed lockfiles. CI uses npm ci, cargo --locked, Go -mod=readonly, and Mix --check-locked plus OpenAPI snapshot comparison. Maven pins direct dependencies and now checks in resolved dependency-tree snapshots. Conformance remains distinct from performance measurement. Conformance is not a performance benchmark.
