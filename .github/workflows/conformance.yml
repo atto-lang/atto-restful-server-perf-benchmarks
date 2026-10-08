@@ -1,0 +1,50 @@
+name: HTTP conformance
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 scripts/check_layout.py
+          python3 scripts/check_spin_parity.py
+          python3 -m py_compile scripts/conformance.py
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check src/js/nodejs/server.mjs
+      - run: python3 scripts/conformance.py -- node src/js/nodejs/server.mjs
+  gin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Build
+        working-directory: src/golang/gin
+        run: |
+          go mod tidy
+          go build -o server .
+      - run: python3 scripts/conformance.py -- ./src/golang/gin/server
+  axum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        working-directory: src/rust/axum
+        run: cargo build --release
+      - run: python3 scripts/conformance.py -- ./src/rust/axum/target/release/oreslang-benchmark-axum
+# Spin requires authenticated checkout of private upstream trees and pinned compiler;
+# source equivalence above is not sufficient to claim runtime conformance.

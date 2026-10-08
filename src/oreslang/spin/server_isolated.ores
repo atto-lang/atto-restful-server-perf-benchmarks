@@ -7,11 +7,11 @@ define isoactor BenchmarkHandler as
   receive(ActorMail<String> mail): void {
     val request = http.claim(mail.value);
     if request.operation_id == "health"; then
-      await request.respond(200, "application/json", "{\\"status\\":\\"ok\\"}");
+      await request.respond(200, "application/json", "{\"status\":\"ok\"}");
     elif request.operation_id == "plaintext"; then
       await request.respond(200, "text/plain; charset=utf-8", "hello, world!");
     elif request.operation_id == "json"; then
-      await request.respond(200, "application/json", "{\\"message\\":\\"hello, world!\\"}");
+      await request.respond(200, "application/json", "{\"message\":\"hello, world!\"}");
     elif request.operation_id == "echo"; then
       await request.start(200, "application/octet-stream");
       loop {

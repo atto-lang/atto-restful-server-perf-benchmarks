@@ -56,3 +56,19 @@ The upstream repo currently provides `scripts/benchmark.py`, `tests/server.ores`
 2. Implement the conformance suite over all four endpoints and payload edge cases.
 3. Add a runner that captures hardware/software provenance and repeatable, machine-readable results.
 4. Run separate persistent-connection and new-connection HTTP/1.1 suites, then publish validated results with complete raw data.
+
+## First implemented servers (not yet verified)
+
+The Node.js, Gin, and Axum implementations and the two Spin actor-mode adapters expose the common four endpoints. Conformance tests must pass before these become verified targets. The CI tests correctness, not performance.
+
+```bash
+python3 scripts/conformance.py -- node src/js/nodejs/server.mjs
+(cd src/golang/gin && go mod tidy && go build -o server .)
+python3 scripts/conformance.py -- ./src/golang/gin/server
+(cd src/rust/axum && cargo build --release)
+python3 scripts/conformance.py -- ./src/rust/axum/target/release/oreslang-benchmark-axum
+```
+
+Spin requires local private pinned compiler/framework checkouts; see [its adapter README](src/oreslang/spin/README.md).
+
+**Known gaps:** Pin transitive dependency locks (`go.sum`, `Cargo.lock`) after validated resolution; compile and run Spin against its exact upstream tree; make Spin's echo body buffering equivalent to the other three before measuring echo latency. Do not publish rankings from incomplete or unverified comparisons.
