@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22"
       - name: Install TypeSpec
@@ -31,7 +31,7 @@ jobs:
   layout:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - run: |
           python3 scripts/check_layout.py
           python3 scripts/check_spin_parity.py
@@ -39,19 +39,21 @@ jobs:
   node:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22"
       - run: node --check src/js/nodejs/server.mjs
+      - name: Exercise Bun/Deno handlers under Node's Web API mocks
+        run: node --test scripts/test_native_js.mjs
       - name: Install contract validator
         run: python3 -m pip install --user jsonschema==4.25.1
       - run: python3 scripts/conformance.py -- node src/js/nodejs/server.mjs
   gin:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version: "1.25"
       - name: Build
@@ -66,8 +68,8 @@ jobs:
   axum:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
       - name: Build
         working-directory: src/rust/axum
         run: cargo build --release --locked
@@ -79,8 +81,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         with:
           distribution: temurin
           java-version: "21"
@@ -100,8 +102,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         with:
           distribution: temurin
           java-version: "21"
@@ -121,8 +123,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
         with:
           otp-version: "27.3"
           elixir-version: "1.18.4"
@@ -141,3 +143,109 @@ jobs:
 
 # Spin runtime validated separately via a private, exact Git-blob CI mirror.
 # See docs/VERIFICATION.md. Local source parity is not runtime proof.
+
+  bun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: "1.3.0"
+      - run: bun --version
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Bun)
+        run: python3 scripts/conformance.py --target js-bun -- bun src/js/bun/server.mjs
+
+  deno:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.5.4
+      - run: deno --version
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Deno)
+        run: python3 scripts/conformance.py --target js-deno -- deno run --allow-env --allow-net src/js/deno/server.mjs
+
+  springboot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Build Spring Boot
+        working-directory: src/java/springboot
+        run: mvn -B -q -DskipTests package
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Spring Boot)
+        run: python3 scripts/conformance.py --target java-springboot -- bash src/java/springboot/run.sh
+
+  mux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: "1.25"
+      - name: Build Gorilla/mux with immutable go.mod/go.sum
+        working-directory: src/golang/mux
+        run: go build -mod=readonly -o server .
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Gorilla/mux)
+        run: python3 scripts/conformance.py --target golang-mux -- ./src/golang/mux/server
+
+  otp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          otp-version: "27.3"
+          rebar3-version: "3.25.1"
+      - name: Build Erlang/OTP + Cowboy
+        working-directory: src/erlang/otp
+        run: rebar3 compile
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (OTP + Cowboy)
+        run: python3 scripts/conformance.py --target erlang-otp -- bash src/erlang/otp/run.sh
+
+  actix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+      - name: Build Actix Web
+        working-directory: src/rust/actix
+        run: cargo build --release
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Actix)
+        run: python3 scripts/conformance.py --target rust-actix -- ./src/rust/actix/target/release/oreslang-benchmark-actix
+
+  ractor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+      - name: Build Ractor + Axum transport
+        working-directory: src/rust/ractor
+        run: cargo build --release
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Ractor + Axum)
+        run: python3 scripts/conformance.py --target rust-ractor -- ./src/rust/ractor/target/release/oreslang-benchmark-ractor

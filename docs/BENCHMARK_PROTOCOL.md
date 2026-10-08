@@ -11,11 +11,11 @@ All test servers listen on `127.0.0.1:${PORT}` unless the runner explicitly sets
 | `GET /health` | `200` / `{"status":"ok"}` | `application/json` |
 | `GET /plaintext` | `200` / `hello, world!` | `text/plain; charset=utf-8` |
 | `GET /json` | `200` / `{"message":"hello, world!"}` | `application/json` |
-| `POST /echo` | `200` / byte-for-byte copy of request body | `application/octet-stream` |
-| `POST /echo` with a body above 1 MiB | `413` / error body implementation-defined | `text/plain; charset=utf-8` |
+| `POST /echo` (0–1 MiB) | `200` / byte-for-byte copy of request body | `application/octet-stream` |
+| `POST /echo` (1 MiB + 256 B) | `413` / error body implementation-defined | `text/plain; charset=utf-8` |
 | `GET /not-found` | `404`; record body but do not include in throughput results | implementation-defined |
 
-Conformance must verify the exact UTF-8 / binary response bodies and status codes; accept equivalent JSON semantics if an implementation uses another valid serialization with different key order (the simple fixed fixtures currently have none). For `POST /echo`, check empty, 1 KiB, and 64 KiB payloads with NUL/non-ASCII bytes; reject silent truncation. Do not quietly substitute text encoding for binary copying.
+Conformance must verify the exact UTF-8 / binary response bodies and status codes; accept equivalent JSON semantics if an implementation uses another valid serialization with different key order (the simple fixed fixtures currently have none). For `POST /echo`, check empty, 1 KiB, 64 KiB, 1 MiB, and 1 MiB + 256 B (413 rejection) with NUL/non-ASCII bytes; reject silent truncation. Do not quietly substitute text encoding for binary copying.
 
 ## Measurement matrix (proposed defaults)
 
@@ -57,3 +57,14 @@ The existing [Spin benchmark notes](https://github.com/ores-truffle-oreslang/ore
 * `scala-akka`: Scala 2.13.17, Akka HTTP 10.2.10 / Akka Stream 2.6.20 (the Maven-Central-available legacy Apache 2.0 licensing line). Maven Scala compiler; bounded strict request body.
 * `erlang-phoenix`: Elixir 1.18.4 and OTP 27.3 CI, Phoenix 1.8.15 on Bandit 1.12.5. Minimal Phoenix.Endpoint/Phoenix.Router/Plug.Conn; one MiB binary body.
 * Different HTTP implementations may have different HTTP parsing, connection handling, runtime scheduler, and request body internals. Preserve the contracts, log the exact versions and adapter choices, and label comparisons carefully.
+
+## Additional adapters: source implemented, runtime verification pending
+
+* Bun and Deno use native HTTP runtime APIs. Node handler mocks cannot prove their native HTTP/1.1 behavior.
+* Spring Boot 3.5.6 runs embedded Tomcat.
+* Gorilla/mux 1.8.1 runs on Go net/http.
+* Erlang/OTP uses Cowboy 2.13.0 / Ranch as the HTTP transport.
+* Actix Web 4.15.0 is a Rust HTTP server.
+* Ractor 0.16.5 uses Axum 0.8.9 for transport; it measures actor dispatch plus Axum, not a standalone Ractor HTTP implementation.
+
+These seven targets remain `implemented` until independently verified, while first-wave CI evidence is retained. The canonical HTTP 413 response media type remains `text/plain; charset=utf-8`. Whitespace around MIME parameters is semantically insignificant.

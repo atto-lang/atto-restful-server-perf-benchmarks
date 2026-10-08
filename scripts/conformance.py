@@ -75,7 +75,14 @@ def verify(case, response):
         raise AssertionError(f"{case['id']} status: {status} != {expected['status']}")
     for key, required in expected["headers"].items():
         actual = headers.get(key, "")
-        if actual.lower() != required.lower():
+        # MIME parameter whitespace is insignificant (e.g., Spring's charset form).
+        if key == "content-type":
+            actual_normal = ";".join(part.strip().lower() for part in actual.split(";"))
+            required_normal = ";".join(part.strip().lower() for part in required.split(";"))
+        else:
+            actual_normal = actual.lower()
+            required_normal = required.lower()
+        if actual_normal != required_normal:
             raise AssertionError(f"{case['id']} header {key}: {actual!r} != {required!r}")
     spec = expected["body"]
     if spec["kind"] == "ignore":
