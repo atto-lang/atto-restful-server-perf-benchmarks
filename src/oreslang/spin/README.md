@@ -4,7 +4,7 @@ This is a benchmark **adapter**, not a fork of Spin. Its source is staged into t
 
 * `server_shared.ores`: dispatch one shared actor per request.
 * `server_isolated.ores`: dispatch one isolated actor per request.
-* Both contain byte-for-byte equivalent handler logic aside from the actor declaration, and expose `GET /health`, `GET /plaintext`, `GET /json`, and `POST /echo`.
+* Both contain byte-for-byte equivalent handler logic aside from the actor declaration. The echo path buffers bounded chunks up to 1 MiB and explicitly returns HTTP 413 when the body exceeds the benchmark limit; the underlying transport has a 2 MiB guardrail so the actor can produce the required error header. Both variants expose `GET /health`, `GET /plaintext`, `GET /json`, and `POST /echo`.
 
 ## Requirements and run commands
 
