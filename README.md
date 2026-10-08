@@ -84,3 +84,19 @@ The following source targets are implemented and have their own conformance jobs
 | Phoenix 1.8.15 / Bandit 1.12.5 | `src/erlang/phoenix` | `mix deps.get && mix compile` from its own directory | `bash src/erlang/phoenix/run.sh` |
 
 Run the shared `python3 scripts/conformance.py -- bash .../run.sh` command after building. The Akka target deliberately uses the older Apache-2 licensed libraries that resolve from Maven Central; do not label it the current licensed Akka stack. Phoenix is an Elixir implementation on BEAM, not an Erlang-only program. Commit generated dependency locks after successful resolution to make the next results reproducible.
+
+## Schema-driven conformance
+
+`contracts/conformance/main.tsp` is the TypeSpec HTTP API with four explicit required routes and response status/Content-Type/body declarations. The CI `contracts` job emits OpenAPI and checks that none of the four methods or the expected response contracts were omitted.
+
+`contracts/conformance/cases.json` describes eight cases, including the fallback 404, four byte-exact echo payload sizes, the 1 MiB boundary, JSON literals, required headers, and status codes. Draft 2020-12 schemas validate this fixture file and the machine-readable test results. Each runnable server executes these fixtures plus keep-alive and 24 concurrent requests (35 total checks).
+
+```bash
+(cd contracts/conformance && npm install --no-audit --no-fund && npm run compile)
+python3 -m pip install jsonschema==4.25.1
+python3 scripts/check_contracts.py --openapi contracts/conformance/generated/openapi.json
+python3 -m unittest discover -s scripts -p 'test_contracts.py' -v
+python3 scripts/conformance.py --target js-nodejs -- node src/js/nodejs/server.mjs
+```
+
+Until transitive lockfiles are committed, direct dependencies are pinned but npm/Maven/Go/Mix/Cargo dependency resolution has known reproducibility gaps. Benchmarks must not be published based on conformance pass rates alone.
