@@ -89,8 +89,10 @@ async fn dispatch(state: AppState, endpoint: Endpoint, input: Bytes) -> HttpRepl
             Some(Duration::from_secs(30)),
         )
         .await;
+    // call() returns Result<CallResult<T>, MessagingErr>, not Result<T, _>.
+    // A timeout or sender drop must never be interpreted as a successful response.
     match result {
-        Ok(response) => (
+        Ok(ractor::rpc::CallResult::Success(response)) => (
             StatusCode::OK,
             [(header::CONTENT_TYPE, response.content_type)],
             response.body,
