@@ -1,7 +1,7 @@
 # Gorilla/mux HTTP benchmark
 
 Uses Go net/http with `github.com/gorilla/mux` v1.8.1 as a router.
-Build: `cd src/golang/mux && go mod tidy && go build -o server .`.
+Build: `cd src/golang/mux && go build -mod=readonly -o server .`.
 Run from repository root: `src/golang/mux/server`.
 Check: `python3 scripts/conformance.py --target golang-mux -- ./src/golang/mux/server`.
 

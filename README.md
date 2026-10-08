@@ -110,7 +110,7 @@ All seven prior placeholders now contain real servers and have separate conforma
 | Bun | Native `Bun.serve` (no framework) | `bun src/js/bun/server.mjs` |
 | Deno | Native `Deno.serve` (no framework) | `deno run --allow-env --allow-net src/js/deno/server.mjs` |
 | Spring Boot | 3.5.6 / embedded Tomcat | `(cd src/java/springboot && mvn -B -q -DskipTests package)`; `bash src/java/springboot/run.sh` |
-| Gorilla/mux | Go `net/http` + mux 1.8.1 | `(cd src/golang/mux && go mod tidy && go build -o server .)`; `src/golang/mux/server` |
+| Gorilla/mux | Go `net/http` + mux 1.8.1 | `(cd src/golang/mux && go build -mod=readonly -o server .)`; `src/golang/mux/server` |
 | Erlang/OTP | Cowboy 2.13.0 + Ranch HTTP transport | `(cd src/erlang/otp && rebar3 compile)`; `bash src/erlang/otp/run.sh` |
 | Actix Web | Actix Web 4.15.0 | `(cd src/rust/actix && cargo build --release)`; `src/rust/actix/target/release/oreslang-benchmark-actix` |
 | Ractor | Ractor 0.16.5 actor + Axum 0.8.9 HTTP transport | `(cd src/rust/ractor && cargo build --release)`; `src/rust/ractor/target/release/oreslang-benchmark-ractor` |
