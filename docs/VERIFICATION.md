@@ -32,3 +32,12 @@ The source Git tree was mirrored byte-for-byte to a private test repository, wit
 ## Not performance evidence
 
 This establishes compatible response behavior for the measured fixtures, not equal scheduler semantics, native transport overhead, allocations, CPU, worker counts, or fairness across runtimes. Spin buffers echo inputs by bounded chunks, and the response transport still differs from some implementations; separate benchmark modes and disclose these differences. Produce credible rankings only after controlled warmups, repeated trials, raw results, and audited hardware/runtime settings.
+
+## Extended adapter validation — 2026-10-08
+
+The seven newly added adapter source trees and the conformance workflow were copied to a separate funded [test branch](https://github.com/messaging-intel/msgint-api-server.rs/tree/feat/rest-all-14-conformance-20261008). Git blob SHA comparison confirmed **22/22 identical source/workflow files** at the initial mirror commit, including all seven runnable adapters and the CI workflow. This is an incremental test mirror based on the previously validated source mirror, **not** an exact copy of the entire latest benchmark repository tree; test-only Spin fixtures and original baseline files are also present.
+
+- [Initial extended matrix](https://github.com/messaging-intel/msgint-api-server.rs/actions/runs/37803077119): Bun, Deno, Gorilla/mux, OTP+Cowboy and Ractor+Axum all reached successful live conformance jobs; Node failed because the mirror initially lacked the newer `scripts/test_native_js.mjs` fixture, and Spring Boot failed due to MIME whitespace normalization.
+- [Follow-up matrix](https://github.com/messaging-intel/msgint-api-server.rs/actions/runs/37803241879): the Node fixture and corrected semantic `Content-Type` comparison were synchronized from this source branch (their Git blob SHA matched); Node, Bun, Deno, and Spring Boot then all passed their live CI jobs. Further jobs, particularly Actix compilation, were still in progress at the time of this evidence entry.
+
+Do **not** interpret this as a cross-language throughput benchmark or as proof all 15 CI jobs completed green. Retain the PR until the complete matrix finishes and compare the tested Git blobs to the final candidate head.
