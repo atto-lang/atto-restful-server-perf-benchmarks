@@ -89,3 +89,103 @@ for (const runtime of ["bun", "deno"]) {
     });
   }
 }
+
+ 
+// A Web Streams reader is allowed to reuse backing storage after each read.
+// Retaining the producer's Uint8Array view corrupts previously buffered bytes.
+for (const runtime of ["bun", "deno"]) {
+  const handler = loadHandler(runtime);
+  const url = "http://127.0.0.1:8080/echo";
+
+  test(`${runtime}/stream-owned-chunks`, async () => {
+    const shared = new Uint8Array([0, 1, 255]);
+    let readCount = 0;
+    let released = 0;
+    const reader = {
+      async read() {
+        readCount += 1;
+        if (readCount === 1) {
+          return { done: false, value: shared };
+        }
+        if (readCount === 2) {
+          shared.set([10, 20, 30]);
+          return { done: false, value: shared };
+        }
+        return { done: true };
+      },
+      releaseLock() {
+        released += 1;
+      },
+      async cancel() {
+        throw new Error("unexpected cancel");
+      },
+    };
+    const response = await handler({
+      method: "POST",
+      url,
+      body: { getReader: () => reader },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(
+      Buffer.from(await response.arrayBuffer()),
+      Buffer.from([0, 1, 255, 10, 20, 30]),
+    );
+    assert.equal(released, 1);
+  });
+
+  test(`${runtime}/stream-one-byte-over-boundary`, async () => {
+    let readCount = 0;
+    let released = 0;
+    let cancelled = 0;
+    const reader = {
+      async read() {
+        readCount += 1;
+        if (readCount === 1) {
+          return { done: false, value: new Uint8Array(maxBody) };
+        }
+        if (readCount === 2) {
+          return { done: false, value: new Uint8Array([255]) };
+        }
+        throw new Error("must cancel immediately after exceeding limit");
+      },
+      async cancel() {
+        cancelled += 1;
+      },
+      releaseLock() {
+        released += 1;
+      },
+    };
+    const response = await handler({
+      method: "POST",
+      url,
+      body: { getReader: () => reader },
+    });
+    assert.equal(response.status, 413);
+    assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), "Payload Too Large");
+    assert.equal(cancelled, 1);
+    assert.equal(released, 1);
+    assert.equal(readCount, 2);
+  });
+
+  test(`${runtime}/stream-read-failure-releases-lock`, async () => {
+    let released = 0;
+    const reader = {
+      async read() {
+        throw new Error("simulated transport failure");
+      },
+      releaseLock() {
+        released += 1;
+      },
+    };
+    const response = await handler({
+      method: "POST",
+      url,
+      body: { getReader: () => reader },
+    });
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), "Bad Request");
+    assert.equal(released, 1);
+  });
+}
