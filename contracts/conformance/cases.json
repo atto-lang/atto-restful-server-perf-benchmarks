@@ -135,6 +135,24 @@
       }
     },
     {
+      "id": "echo-over-limit",
+      "method": "POST",
+      "path": "/echo",
+      "inOpenApi": true,
+      "payload": {
+        "kind": "binary-pattern",
+        "byteRange": 256,
+        "repeat": 4097
+      },
+      "expected": {
+        "status": 413,
+        "headers": {},
+        "body": {
+          "kind": "ignore"
+        }
+      }
+    },
+    {
       "id": "not-found",
       "method": "GET",
       "path": "/not-found",

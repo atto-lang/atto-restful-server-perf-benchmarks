@@ -89,7 +89,7 @@ Run the shared `python3 scripts/conformance.py -- bash .../run.sh` command after
 
 `contracts/conformance/main.tsp` is the TypeSpec HTTP API with four explicit required routes and response status/Content-Type/body declarations. The CI `contracts` job emits OpenAPI and checks that none of the four methods or the expected response contracts were omitted.
 
-`contracts/conformance/cases.json` describes eight cases, including the fallback 404, four byte-exact echo payload sizes, the 1 MiB boundary, JSON literals, required headers, and status codes. Draft 2020-12 schemas validate this fixture file and the machine-readable test results. Each runnable server executes these fixtures plus keep-alive and 24 concurrent requests (35 total checks).
+`contracts/conformance/cases.json` describes nine cases, including the fallback 404, four byte-exact successful echo payload sizes, an explicit 1 MiB + 256 B rejection boundary (HTTP 413), JSON literals, required headers, and status codes. Draft 2020-12 schemas validate this fixture file and the machine-readable test results. Each runnable server executes these fixtures plus keep-alive and 24 concurrent requests (36 total checks).
 
 ```bash
 (cd contracts/conformance && npm install --no-audit --no-fund && npm run compile)

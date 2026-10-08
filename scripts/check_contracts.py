@@ -34,28 +34,40 @@ def load_cases():
             if pair not in REQUIRED:
                 raise ValueError(f"undeclared extra contract operation: {pair}")
             status, mime, kind = REQUIRED[pair]
-            if str(expected["status"]) != status:
-                raise ValueError(f"mismatched required status: {case['id']}")
-            if expected["headers"].get("content-type", "").lower() != mime:
-                raise ValueError(f"wrong required Content-Type: {case['id']}")
-            if expected["body"]["kind"] != kind:
-                raise ValueError(f"wrong required body type: {case['id']}")
+            is_over_limit = pair == ("POST", "/echo") and (
+                case.get("payload", {}).get("byteRange", 0)
+                * case.get("payload", {}).get("repeat", 0) > MAX_ECHO
+            )
+            if is_over_limit:
+                # Each framework is allowed its own error body/headers for 413.
+                # The HTTP status must be 413 and the successful echo path must
+                # never quietly truncate a body beyond MAX_ECHO.
+                if expected["status"] != 413 or expected["body"]["kind"] != "ignore":
+                    raise ValueError(f"oversized echo must reject with 413: {case['id']}")
+            else:
+                if str(expected["status"]) != status:
+                    raise ValueError(f"mismatched required status: {case['id']}")
+                if expected["headers"].get("content-type", "").lower() != mime:
+                    raise ValueError(f"wrong required Content-Type: {case['id']}")
+                if expected["body"]["kind"] != kind:
+                    raise ValueError(f"wrong required body type: {case['id']}")
             seen.add(pair)
         elif pair != ("GET", "/not-found") or expected["status"] != 404:
             raise ValueError(f"unexpected unmodeled scenario: {case['id']}")
         if case["method"] == "POST":
             if "payload" not in case:
                 raise ValueError(f"missing binary fixture: {case['id']}")
-            if case["payload"]["byteRange"] * case["payload"]["repeat"] > MAX_ECHO:
-                raise ValueError(f"echo fixture exceeds 1MiB limit: {case['id']}")
+            size = case["payload"]["byteRange"] * case["payload"]["repeat"]
+            if size > MAX_ECHO + 256:
+                raise ValueError(f"oversized fixture exceeds test boundary: {case['id']}")
         elif "payload" in case:
             raise ValueError(f"GET request must not carry payload: {case['id']}")
     if seen != set(REQUIRED):
         raise ValueError(f"missing required fixture operations: {set(REQUIRED) - seen}")
-    if len(data["scenarios"]) < 8 or "not-found" not in ids:
-        raise ValueError("not-found and all 4 binary echo cases are required")
+    if len(data["scenarios"]) < 9 or "not-found" not in ids or "echo-over-limit" not in ids:
+        raise ValueError("not-found, 413 boundary, and all 4 binary echo cases are required")
     repeats = {x.get("payload", {}).get("repeat") for x in data["scenarios"] if x["method"] == "POST"}
-    if repeats != {0, 4, 256, 4096}:
+    if repeats != {0, 4, 256, 4096, 4097}:
         raise ValueError(f"binary echo fixtures missing expected lengths: {repeats}")
     return data
 
