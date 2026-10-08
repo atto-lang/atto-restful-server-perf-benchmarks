@@ -1,7 +1,7 @@
 # HTTP conformance contracts
 
 * `main.tsp`: authoritative TypeSpec declarations for the four **successful API operations**, response statuses, media types, body schemas, and the 413 error case.
-* `tspconfig.yaml`, `package.json`: compile TypeSpec to OpenAPI. Run `npm install` and `npm run compile` from this folder. CI also checks that the generated OpenAPI declares exactly the four required route/method pairs.
+* `tspconfig.yaml`, `package.json`: compile TypeSpec to OpenAPI. Run `npm ci` and `npm run compile` from this folder. CI also checks that the generated OpenAPI declares exactly the four required route/method pairs.
 * `cases.json`: runtime fixtures for request bodies and expected response headers, statuses, and JSON values, plus the 404 fallback probe (not an OpenAPI route).
 * `cases.schema.json`: Draft 2020-12 JSON Schema for the fixture format.
 * `result.schema.json`: Draft 2020-12 JSON Schema for machine-readable conformance results.

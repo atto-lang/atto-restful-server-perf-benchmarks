@@ -99,4 +99,4 @@ python3 -m unittest discover -s scripts -p 'test_contracts.py' -v
 python3 scripts/conformance.py --target js-nodejs -- node src/js/nodejs/server.mjs
 ```
 
-Until transitive lockfiles are committed, direct dependencies are pinned but npm/Maven/Go/Mix/Cargo dependency resolution has known reproducibility gaps. Benchmarks must not be published based on conformance pass rates alone.
+TypeSpec npm, Rust Cargo, Go modules, and Phoenix Mix now have committed lockfiles. CI uses npm ci, cargo --locked, Go -mod=readonly, and Mix --check-locked plus OpenAPI snapshot comparison. Maven pins direct dependencies but has no lockfile snapshot yet; benchmark provenance must still capture its full dependency graph. Conformance is not a performance benchmark.
