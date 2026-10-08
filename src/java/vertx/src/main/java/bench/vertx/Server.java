@@ -42,7 +42,11 @@ public final class Server {
     router.post("/echo")
         .handler(BodyHandler.create().setHandleFileUploads(false).setBodyLimit(MAX_BODY))
         .handler(ctx -> {
-          Buffer body = ctx.body() == null ? Buffer.buffer() : ctx.body().buffer();
+          Buffer body = ctx.body() == null ? null : ctx.body().buffer();
+          if (body == null) {
+            // Vert.x returns a null buffer for an empty request body.
+            body = Buffer.buffer();
+          }
           ctx.response().setStatusCode(200).putHeader("Content-Type", "application/octet-stream").end(body);
         });
     // No logging/session/cookie middleware. Router preserves HTTP/1.1 keep-alive.

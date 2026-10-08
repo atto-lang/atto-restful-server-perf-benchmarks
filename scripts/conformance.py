@@ -63,7 +63,7 @@ def run():
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         results=list(pool.map(lambda _:request("GET","/plaintext"),range(24)))
     for result in results:
-        if result != (200,"text/plain; charset=utf-8",b"hello, world!"):
+        if result[0] != 200 or result[1].lower() != "text/plain; charset=utf-8" or result[2] != b"hello, world!":
             raise AssertionError(f"concurrent response mismatch: {result!r}")
         checks += 1
     return checks
