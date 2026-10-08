@@ -27,6 +27,7 @@ jobs:
           python3 scripts/check_contracts.py --openapi contracts/conformance/generated/openapi.json
           git diff --exit-code -- contracts/conformance/generated/openapi.json contracts/conformance/package-lock.json
           python3 -m unittest discover -s scripts -p 'test_contracts.py' -v
+          python3 -m unittest discover -s scripts -p 'test_harness.py' -v
       - name: Export checked TypeSpec lock and emitted OpenAPI
         run: |
           python3 scripts/export_lockfile.py contracts/conformance/package-lock.json
