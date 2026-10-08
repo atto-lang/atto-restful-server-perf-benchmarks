@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Implemented means source/run commands exist, NOT that live conformance passed",
+  "description": "Implemented means runnable source/build commands exist, NOT that live conformance or performance benchmarks passed",
   "spin_upstream": {
     "repository": "ores-truffle-oreslang/oreslang-spin",
     "commit": "8f29b2f75f13beb3e03357e6b15839129c33d72b"
@@ -20,7 +20,7 @@
       "ecosystem": "js",
       "implementation": "Bun",
       "kind": "runtime",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "js-deno",
@@ -28,7 +28,7 @@
       "ecosystem": "js",
       "implementation": "Deno",
       "kind": "runtime",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "java-vertx",
@@ -44,7 +44,7 @@
       "ecosystem": "java",
       "implementation": "Spring Boot",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "golang-gin",
@@ -60,7 +60,7 @@
       "ecosystem": "golang",
       "implementation": "Gorilla/mux",
       "kind": "router",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "scala-akka",
@@ -76,7 +76,7 @@
       "ecosystem": "erlang",
       "implementation": "Erlang/OTP",
       "kind": "runtime",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "erlang-phoenix",
@@ -100,7 +100,7 @@
       "ecosystem": "rust",
       "implementation": "Actix Web",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "rust-ractor",
@@ -108,7 +108,7 @@
       "ecosystem": "rust",
       "implementation": "Ractor with HTTP adapter (TBD)",
       "kind": "actor-framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "oreslang-spin",

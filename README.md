@@ -18,7 +18,7 @@ Reproducible HTTP-server comparisons of [Oreslang Spin](https://github.com/ores-
 
 Phoenix is an **Elixir** web framework running on the Erlang VM (BEAM). It is grouped under `erlang/` as requested, not presented as an Erlang-native framework. Ractor is an actor framework; its eventual HTTP integration must be named and disclosed to avoid confusing a framework-versus-server comparison.
 
-Unimplemented leaf directories are placeholders until their servers, dependency lockfiles, reproducible build/run commands, and conformance tests are added. Placeholder `.gitkeep` files are intentional because Git does not track empty directories.
+All fourteen targets now have runnable source or reference adapters. An `implemented` label does **not** mean validated: each adapter must pass the contract suite, then receive reproducible lockfiles and performance measurements before a ranking can be published. Some historical `.gitkeep` files remain harmless in populated directories.
 
 ## Common contract
 
@@ -52,12 +52,12 @@ The upstream repo currently provides `scripts/benchmark.py`, `tests/server.ores`
 
 ## Next work
 
-1. Add a minimal runnable server and dependency lockfile for each framework.
-2. Implement the conformance suite over all four endpoints and payload edge cases.
+1. Run the full conformance matrix in a funded CI environment and fix any implementation failures.
+2. Commit generated dependency lockfiles after successful resolution and record all runtime/toolchain versions.
 3. Add a runner that captures hardware/software provenance and repeatable, machine-readable results.
 4. Run separate persistent-connection and new-connection HTTP/1.1 suites, then publish validated results with complete raw data.
 
-## First implemented servers (not yet verified)
+## Initial servers (not yet verified)
 
 The Node.js, Gin, and Axum implementations and the two Spin actor-mode adapters expose the common four endpoints. Conformance tests must pass before these become verified targets. The CI tests correctness, not performance.
 
@@ -100,3 +100,21 @@ python3 scripts/conformance.py --target js-nodejs -- node src/js/nodejs/server.m
 ```
 
 Until transitive lockfiles are committed, direct dependencies are pinned but npm/Maven/Go/Mix/Cargo dependency resolution has known reproducibility gaps. Benchmarks must not be published based on conformance pass rates alone.
+
+## Remaining framework implementations (added, unverified)
+
+All seven prior placeholders now contain real servers and have separate conformance CI jobs:
+
+| Target | Dependencies / implementation | Build / run |
+| --- | --- | --- |
+| Bun | Native `Bun.serve` (no framework) | `bun src/js/bun/server.mjs` |
+| Deno | Native `Deno.serve` (no framework) | `deno run --allow-env --allow-net src/js/deno/server.mjs` |
+| Spring Boot | 3.5.6 / embedded Tomcat | `(cd src/java/springboot && mvn -B -q -DskipTests package)`; `bash src/java/springboot/run.sh` |
+| Gorilla/mux | Go `net/http` + mux 1.8.1 | `(cd src/golang/mux && go mod tidy && go build -o server .)`; `src/golang/mux/server` |
+| Erlang/OTP | Cowboy 2.13.0 + Ranch HTTP transport | `(cd src/erlang/otp && rebar3 compile)`; `bash src/erlang/otp/run.sh` |
+| Actix Web | Actix Web 4.15.0 | `(cd src/rust/actix && cargo build --release)`; `src/rust/actix/target/release/oreslang-benchmark-actix` |
+| Ractor | Ractor 0.16.5 actor + Axum 0.8.9 HTTP transport | `(cd src/rust/ractor && cargo build --release)`; `src/rust/ractor/target/release/oreslang-benchmark-ractor` |
+
+Use `python3 scripts/conformance.py --target TARGET-ID -- COMMAND` from the repository root, or see the specific directory README. These are **not verified until real runnable tests pass**.
+
+Ractor + Axum deliberately routes requests through one persistent actor's mailbox; it measures **actor processing plus Axum transport**, not a standalone Ractor HTTP framework. Erlang/OTP similarly uses Cowboy as its HTTP transport. Neither result should be conflated with a pure HTTP framework result or used to infer actor-per-request overhead.

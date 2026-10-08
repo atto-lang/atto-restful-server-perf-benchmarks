@@ -127,3 +127,111 @@ jobs:
 
 # Spin requires authenticated checkout of private upstream trees and pinned compiler;
 # source equivalence above is not sufficient to claim runtime conformance.
+
+  bun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.0"
+      - run: bun --version
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Bun)
+        run: python3 scripts/conformance.py --target js-bun -- bun src/js/bun/server.mjs
+
+  deno:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.4
+      - run: deno --version
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Deno)
+        run: python3 scripts/conformance.py --target js-deno -- deno run --allow-env --allow-net src/js/deno/server.mjs
+
+  springboot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Build Spring Boot
+        working-directory: src/java/springboot
+        run: mvn -B -q -DskipTests package
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Spring Boot)
+        run: python3 scripts/conformance.py --target java-springboot -- bash src/java/springboot/run.sh
+
+  mux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Build Gorilla/mux
+        working-directory: src/golang/mux
+        run: |
+          go mod tidy
+          go build -o server .
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Gorilla/mux)
+        run: python3 scripts/conformance.py --target golang-mux -- ./src/golang/mux/server
+
+  otp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          rebar3-version: "3.25.1"
+      - name: Build Erlang/OTP + Cowboy
+        working-directory: src/erlang/otp
+        run: rebar3 compile
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (OTP + Cowboy)
+        run: python3 scripts/conformance.py --target erlang-otp -- bash src/erlang/otp/run.sh
+
+  actix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build Actix Web
+        working-directory: src/rust/actix
+        run: cargo build --release
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Actix)
+        run: python3 scripts/conformance.py --target rust-actix -- ./src/rust/actix/target/release/oreslang-benchmark-actix
+
+  ractor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build Ractor + Axum transport
+        working-directory: src/rust/ractor
+        run: cargo build --release
+      - name: Install contract validator
+        run: python3 -m pip install --user jsonschema==4.25.1
+      - name: HTTP conformance (Ractor + Axum)
+        run: python3 scripts/conformance.py --target rust-ractor -- ./src/rust/ractor/target/release/oreslang-benchmark-ractor
