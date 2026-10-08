@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Implementation inventory; status=scaffold means no executable benchmark candidate yet",
+  "description": "Implemented means source/run commands exist, NOT that live conformance passed",
   "spin_upstream": {
     "repository": "ores-truffle-oreslang/oreslang-spin",
     "commit": "8f29b2f75f13beb3e03357e6b15839129c33d72b"
@@ -12,7 +12,7 @@
       "ecosystem": "js",
       "implementation": "Node.js",
       "kind": "runtime",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "js-bun",
@@ -36,7 +36,7 @@
       "ecosystem": "java",
       "implementation": "Vert.x",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "java-springboot",
@@ -52,7 +52,7 @@
       "ecosystem": "golang",
       "implementation": "Gin",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "golang-mux",
@@ -68,7 +68,7 @@
       "ecosystem": "scala",
       "implementation": "Akka HTTP",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "erlang-otp",
@@ -84,7 +84,7 @@
       "ecosystem": "erlang",
       "implementation": "Phoenix (Elixir/BEAM)",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "rust-axum",
@@ -92,7 +92,7 @@
       "ecosystem": "rust",
       "implementation": "Axum",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "rust-actix",
@@ -116,7 +116,7 @@
       "ecosystem": "oreslang",
       "implementation": "Oreslang Spin",
       "kind": "baseline",
-      "status": "scaffold"
+      "status": "implemented"
     }
   ]
 }

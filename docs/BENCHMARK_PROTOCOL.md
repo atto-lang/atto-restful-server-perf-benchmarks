@@ -42,3 +42,17 @@ Conformance must verify the exact UTF-8 / binary response bodies and status code
 The future runner should write immutable machine-readable trial files to `results/` with at least `target_id`, `source_sha`, `environment`, `scenario`, `concurrency`, `connections`, `warmup_seconds`, `measurement_seconds`, `trial`, `requests_ok`, `errors`, `throughput_rps`, `latency_ms` (p50/p95/p99), `cpu`, and `rss_bytes`. No fabricated or missing samples should be converted to zeroes. Aggregates should reference raw trial data and include dispersion/confidence intervals.
 
 The existing [Spin benchmark notes](https://github.com/ores-truffle-oreslang/oreslang-spin/blob/main/docs/BENCHMARK.md) are historical context, not cross-language evidence.
+
+## Implementation notes (first tranche)
+
+* The Node.js server uses the built-in `node:http` implementation; it is a runtime baseline rather than an Express/Fastify framework benchmark.
+* Node.js, Gin, and Axum buffer `POST /echo` request bodies with a 1 MiB maximum. The Spin implementation presently streams bounded chunks from the HTTP capability; this is a **known workload-implementation difference**, so echo latency comparisons must be labeled accordingly or revised for semantic parity.
+* Spin's draft server currently binds to 127.0.0.1:8080. The `run.sh` adapter rejects alternate ports until a verified Oreslang environmental-port API is available. The other targets accept `HOST` and `PORT`.
+* Only conformance (not performance rankings) is run in automated CI. Benchmark samples require a controlled environment and results with full provenance.
+
+## Java / Scala / Elixir targets
+
+* `java-vertx`: Vert.x Web 4.5.34; Java 21 CI, application bytecode target 17; direct Router and BodyHandler with 1 MiB cap.
+* `scala-akka`: Scala 2.13.17, Akka HTTP 10.2.10 / Akka Stream 2.6.20 (the Maven-Central-available legacy Apache 2.0 licensing line). Maven Scala compiler; bounded strict request body.
+* `erlang-phoenix`: Elixir 1.18.4 and OTP 27.3 CI, Phoenix 1.8.15 on Bandit 1.12.5. Minimal Phoenix.Endpoint/Phoenix.Router/Plug.Conn; one MiB binary body.
+* Different HTTP implementations may have different HTTP parsing, connection handling, runtime scheduler, and request body internals. Preserve the contracts, log the exact versions and adapter choices, and label comparisons carefully.
