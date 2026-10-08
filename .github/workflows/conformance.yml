@@ -46,5 +46,53 @@ jobs:
         working-directory: src/rust/axum
         run: cargo build --release
       - run: python3 scripts/conformance.py -- ./src/rust/axum/target/release/oreslang-benchmark-axum
+
+  vertx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Build Vert.x Web
+        working-directory: src/java/vertx
+        run: mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
+      - name: HTTP conformance (Vert.x)
+        run: python3 scripts/conformance.py -- bash src/java/vertx/run.sh
+  akka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Build legacy Akka HTTP (Apache line)
+        working-directory: src/scala/akka
+        run: mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
+      - name: HTTP conformance (Akka)
+        run: python3 scripts/conformance.py -- bash src/scala/akka/run.sh
+  phoenix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.4"
+      - name: Resolve and compile Phoenix/Bandit
+        working-directory: src/erlang/phoenix
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+          mix compile
+      - name: HTTP conformance (Phoenix)
+        run: python3 scripts/conformance.py -- bash src/erlang/phoenix/run.sh
+
 # Spin requires authenticated checkout of private upstream trees and pinned compiler;
 # source equivalence above is not sufficient to claim runtime conformance.

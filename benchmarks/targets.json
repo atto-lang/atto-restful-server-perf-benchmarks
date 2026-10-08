@@ -36,7 +36,7 @@
       "ecosystem": "java",
       "implementation": "Vert.x",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "java-springboot",
@@ -68,7 +68,7 @@
       "ecosystem": "scala",
       "implementation": "Akka HTTP",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "erlang-otp",
@@ -84,7 +84,7 @@
       "ecosystem": "erlang",
       "implementation": "Phoenix (Elixir/BEAM)",
       "kind": "framework",
-      "status": "scaffold"
+      "status": "implemented"
     },
     {
       "id": "rust-axum",

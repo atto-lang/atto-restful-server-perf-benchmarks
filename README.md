@@ -2,7 +2,7 @@
 
 Reproducible HTTP-server comparisons of [Oreslang Spin](https://github.com/ores-truffle-oreslang/oreslang-spin) against JavaScript, JVM, Go, Rust, and BEAM frameworks.
 
-**Status:** repository scaffold only. No comparison results or framework implementations are claimed yet. Spin is a draft HTTP/1.1 framework and its existing local benchmark is not a cross-framework performance result.
+**Status:** implementations are being added and verified; no cross-language benchmark rankings have been generated. Spin is a draft HTTP/1.1 framework and its existing local benchmark is not a cross-framework performance result.
 
 ## Implementations
 
@@ -18,7 +18,7 @@ Reproducible HTTP-server comparisons of [Oreslang Spin](https://github.com/ores-
 
 Phoenix is an **Elixir** web framework running on the Erlang VM (BEAM). It is grouped under `erlang/` as requested, not presented as an Erlang-native framework. Ractor is an actor framework; its eventual HTTP integration must be named and disclosed to avoid confusing a framework-versus-server comparison.
 
-Each leaf directory is a placeholder until its server, dependency lockfile, reproducible build/run commands, and conformance tests are added. Placeholder `.gitkeep` files are intentional because Git does not track empty directories.
+Unimplemented leaf directories are placeholders until their servers, dependency lockfiles, reproducible build/run commands, and conformance tests are added. Placeholder `.gitkeep` files are intentional because Git does not track empty directories.
 
 ## Common contract
 
@@ -72,3 +72,15 @@ python3 scripts/conformance.py -- ./src/rust/axum/target/release/oreslang-benchm
 Spin requires local private pinned compiler/framework checkouts; see [its adapter README](src/oreslang/spin/README.md).
 
 **Known gaps:** Pin transitive dependency locks (`go.sum`, `Cargo.lock`) after validated resolution; compile and run Spin against its exact upstream tree; make Spin's echo body buffering equivalent to the other three before measuring echo latency. Do not publish rankings from incomplete or unverified comparisons.
+
+## JVM and BEAM benchmark targets
+
+The following source targets are implemented and have their own conformance jobs:
+
+| Framework | Implementation | Build | Run |
+| --- | --- | --- | --- |
+| Vert.x Web 4.5.34 | `src/java/vertx` | `mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt` | `bash src/java/vertx/run.sh` |
+| Akka HTTP 10.2.10 | `src/scala/akka` | same Maven command from its own directory | `bash src/scala/akka/run.sh` |
+| Phoenix 1.8.15 / Bandit 1.12.5 | `src/erlang/phoenix` | `mix deps.get && mix compile` from its own directory | `bash src/erlang/phoenix/run.sh` |
+
+Run the shared `python3 scripts/conformance.py -- bash .../run.sh` command after building. The Akka target deliberately uses the older Apache-2 licensed libraries that resolve from Maven Central; do not label it the current licensed Akka stack. Phoenix is an Elixir implementation on BEAM, not an Erlang-only program. Commit generated dependency locks after successful resolution to make the next results reproducible.
