@@ -56,7 +56,16 @@ def verify(case, response):
         raise AssertionError(f"{case['id']} status: {status} != {expected['status']}")
     for key, required in expected["headers"].items():
         actual = headers.get(key, "")
-        if actual.lower() != required.lower():
+        # HTTP media-type parameter whitespace is insignificant. Servlet
+        # containers often emit text/plain;charset=utf-8 instead of the
+        # semantically identical text/plain; charset=utf-8.
+        if key == "content-type":
+            actual_normal = ";".join(x.strip().lower() for x in actual.split(";"))
+            required_normal = ";".join(x.strip().lower() for x in required.split(";"))
+        else:
+            actual_normal = actual.lower()
+            required_normal = required.lower()
+        if actual_normal != required_normal:
             raise AssertionError(f"{case['id']} header {key}: {actual!r} != {required!r}")
     spec = expected["body"]
     if spec["kind"] == "ignore":

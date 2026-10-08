@@ -97,7 +97,9 @@ async fn dispatch(state: AppState, endpoint: Endpoint, input: Bytes) -> HttpRepl
             [(header::CONTENT_TYPE, response.content_type)],
             response.body,
         ),
-        Err(_) => (
+        Ok(ractor::rpc::CallResult::Timeout)
+        | Ok(ractor::rpc::CallResult::SenderError)
+        | Err(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
             [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
             Bytes::from_static(b"Actor unavailable"),

@@ -1,7 +1,7 @@
 import "@typespec/http";
 using TypeSpec.Http;
 
-@service(#{ title: "Oreslang HTTP benchmark conformance", version: "1.0.0" })
+@service(#{ title: "Oreslang HTTP benchmark conformance" })
 namespace BenchmarkConformance {
   model HealthResponse {
     status: "ok";
