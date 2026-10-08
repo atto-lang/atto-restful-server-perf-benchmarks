@@ -118,3 +118,7 @@ All seven prior placeholders now contain real servers and have separate conforma
 Use `python3 scripts/conformance.py --target TARGET-ID -- COMMAND` from the repository root, or see the specific directory README. These are **not verified until real runnable tests pass**.
 
 Ractor + Axum deliberately routes requests through one persistent actor's mailbox; it measures **actor processing plus Axum transport**, not a standalone Ractor HTTP framework. Erlang/OTP similarly uses Cowboy as its HTTP transport. Neither result should be conflated with a pure HTTP framework result or used to infer actor-per-request overhead.
+
+## Dependency-free Bun/Deno handler unit tests
+
+`node --test scripts/test_native_js.mjs` runs 18 request-handler assertions using Node 22's built-in Request/Response/Web Streams and mocked Bun/Deno server APIs. The checks cover route payloads, binary echo, exact 1 MiB acceptance, 413 overflow, MIME types, Content-Length, and 404 handling. These are **handler tests only**; they never establish actual Bun/Deno runtime compatibility or HTTP/1.1 keep-alive. Live conformance remains required.
