@@ -6,3 +6,5 @@ Run from repository root: `bash src/java/springboot/run.sh`.
 Check: `python3 scripts/conformance.py --target java-springboot -- bash src/java/springboot/run.sh`.
 
 Set `HOST` and `PORT` to override the default 127.0.0.1:8080. No authentication, templating, Jackson encoding, or custom middleware is involved in the four benchmark handlers. Request bodies are read in bounded chunks and echoed unchanged through 1 MiB.
+
+A committed `dependency-tree.lock` records the resolved Maven dependency graph. CI regenerates it and fails on drift. This snapshot is evidence of the tested resolution, not an immutable Maven artifact cache.
