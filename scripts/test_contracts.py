@@ -9,7 +9,7 @@ from check_contracts import REQUIRED, load_cases, check_openapi
 class ContractTests(unittest.TestCase):
     def test_load_cases(self):
         cases = load_cases()
-        self.assertEqual(len(cases["scenarios"]), 8)
+        self.assertEqual(len(cases["scenarios"]), 9)
 
     def test_required_routes(self):
         self.assertEqual(set(REQUIRED), {

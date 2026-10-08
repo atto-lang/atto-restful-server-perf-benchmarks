@@ -33,7 +33,8 @@ def load_cases():
         if case["inOpenApi"]:
             if pair not in REQUIRED:
                 raise ValueError(f"undeclared extra contract operation: {pair}")
-            status, mime, kind = REQUIRED[pair]
+            oversized = case.get("payload", {}).get("repeat") == 4097
+            status, mime, kind = ("413", "text/plain; charset=utf-8", "ignore") if oversized else REQUIRED[pair]
             if str(expected["status"]) != status:
                 raise ValueError(f"mismatched required status: {case['id']}")
             if expected["headers"].get("content-type", "").lower() != mime:
@@ -46,16 +47,19 @@ def load_cases():
         if case["method"] == "POST":
             if "payload" not in case:
                 raise ValueError(f"missing binary fixture: {case['id']}")
-            if case["payload"]["byteRange"] * case["payload"]["repeat"] > MAX_ECHO:
-                raise ValueError(f"echo fixture exceeds 1MiB limit: {case['id']}")
+            size = case["payload"]["byteRange"] * case["payload"]["repeat"]
+            if size > MAX_ECHO and (size != MAX_ECHO + 256 or expected["status"] != 413):
+                raise ValueError(f"unsupported oversize echo fixture: {case['id']}")
+            if size <= MAX_ECHO and expected["status"] != 200:
+                raise ValueError(f"in-range binary echo should succeed: {case['id']}")
         elif "payload" in case:
             raise ValueError(f"GET request must not carry payload: {case['id']}")
     if seen != set(REQUIRED):
         raise ValueError(f"missing required fixture operations: {set(REQUIRED) - seen}")
-    if len(data["scenarios"]) < 8 or "not-found" not in ids:
+    if len(data["scenarios"]) != 9 or "not-found" not in ids or "echo-too-large" not in ids:
         raise ValueError("not-found and all 4 binary echo cases are required")
     repeats = {x.get("payload", {}).get("repeat") for x in data["scenarios"] if x["method"] == "POST"}
-    if repeats != {0, 4, 256, 4096}:
+    if repeats != {0, 4, 256, 4096, 4097}:
         raise ValueError(f"binary echo fixtures missing expected lengths: {repeats}")
     return data
 
