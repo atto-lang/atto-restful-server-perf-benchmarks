@@ -1,0 +1,58 @@
+# Oreslang RESTful server performance benchmarks
+
+Reproducible HTTP-server comparisons of [Oreslang Spin](https://github.com/ores-truffle-oreslang/oreslang-spin) against JavaScript, JVM, Go, Rust, and BEAM frameworks.
+
+**Status:** repository scaffold only. No comparison results or framework implementations are claimed yet. Spin is a draft HTTP/1.1 framework and its existing local benchmark is not a cross-framework performance result.
+
+## Implementations
+
+| Ecosystem | Frameworks / runtimes |
+| --- | --- |
+| JavaScript | `src/js/nodejs`, `src/js/bun`, `src/js/deno` |
+| Java | `src/java/vertx`, `src/java/springboot` |
+| Go | `src/golang/gin`, `src/golang/mux` |
+| Scala | `src/scala/akka` |
+| Erlang / BEAM | `src/erlang/otp`, `src/erlang/phoenix` |
+| Rust | `src/rust/axum`, `src/rust/actix`, `src/rust/ractor` |
+| Oreslang baseline | `src/oreslang/spin` (reference adapter; upstream implementation lives in oreslang-spin) |
+
+Phoenix is an **Elixir** web framework running on the Erlang VM (BEAM). It is grouped under `erlang/` as requested, not presented as an Erlang-native framework. Ractor is an actor framework; its eventual HTTP integration must be named and disclosed to avoid confusing a framework-versus-server comparison.
+
+Each leaf directory is a placeholder until its server, dependency lockfile, reproducible build/run commands, and conformance tests are added. Placeholder `.gitkeep` files are intentional because Git does not track empty directories.
+
+## Common contract
+
+All candidates must implement the *same behavior* before results are published:
+
+| Endpoint | Expected response |
+| --- | --- |
+| `GET /health` | HTTP 200, UTF-8 JSON body `{"status":"ok"}` |
+| `GET /plaintext` | HTTP 200, UTF-8 text body `hello, world!` |
+| `GET /json` | HTTP 200, UTF-8 JSON body `{"message":"hello, world!"}` |
+| `POST /echo` | HTTP 200, byte-for-byte copy of the supplied request body; binary payloads supported |
+
+The implementation must bind to a configurable local port and expose clearly documented startup and shutdown commands. Do not add caches, middleware, work, or headers to one implementation that are absent from the equivalent comparison unless a separate experiment specifically measures their impact. Include a fixed-size request-body case and an empty-body case.
+
+See [docs/BENCHMARK_PROTOCOL.md](docs/BENCHMARK_PROTOCOL.md) for validity criteria, environment capture, and reporting requirements.
+
+## Benchmark policy
+
+* First test correctness; record failures and error rates, not just successful requests.
+* Keep warm-up, measurements, concurrency, connection reuse, payload, and HTTP protocol identical for every server.
+* Separate **HTTP/server** overhead from **per-request actor creation** overhead. Spin shared/isolated actor modes are separate rows; do not compare different handler behavior as though identical.
+* Pin and report language/runtime/compiler/framework versions and Git commit SHAs. Do not silently upgrade dependencies within a run.
+* Report requests/second, p50/p95/p99 latency, error rate, CPU, RSS, and measurement methodology. Prefer multiple independent trials and a distinct load-generator process/host.
+* Avoid publishing winner claims until identical workloads have passed the conformance suite and been reproduced.
+
+## Oreslang Spin
+
+Spin source: https://github.com/ores-truffle-oreslang/oreslang-spin
+
+The upstream repo currently provides `scripts/benchmark.py`, `tests/server.ores`, and `docs/BENCHMARK.md`. Its initial localhost test creates a **new HTTP/1.1 connection per request** and measures shared and isolated actor paths that have different handler implementations. That result is *not* directly comparable to a keep-alive benchmark in another language. The adapter under `src/oreslang/spin` will eventually run the **same contract** as every other candidate while recording the exact upstream source/compiler pins.
+
+## Next work
+
+1. Add a minimal runnable server and dependency lockfile for each framework.
+2. Implement the conformance suite over all four endpoints and payload edge cases.
+3. Add a runner that captures hardware/software provenance and repeatable, machine-readable results.
+4. Run separate persistent-connection and new-connection HTTP/1.1 suites, then publish validated results with complete raw data.
