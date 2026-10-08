@@ -12,6 +12,7 @@ All test servers listen on `127.0.0.1:${PORT}` unless the runner explicitly sets
 | `GET /plaintext` | `200` / `hello, world!` | `text/plain; charset=utf-8` |
 | `GET /json` | `200` / `{"message":"hello, world!"}` | `application/json` |
 | `POST /echo` | `200` / byte-for-byte copy of request body | `application/octet-stream` |
+| `POST /echo` with a body above 1 MiB | `413` / error body implementation-defined | `text/plain; charset=utf-8` |
 | `GET /not-found` | `404`; record body but do not include in throughput results | implementation-defined |
 
 Conformance must verify the exact UTF-8 / binary response bodies and status codes; accept equivalent JSON semantics if an implementation uses another valid serialization with different key order (the simple fixed fixtures currently have none). For `POST /echo`, check empty, 1 KiB, and 64 KiB payloads with NUL/non-ASCII bytes; reject silent truncation. Do not quietly substitute text encoding for binary copying.

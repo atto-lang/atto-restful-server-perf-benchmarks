@@ -57,7 +57,7 @@ def load_cases():
     if seen != set(REQUIRED):
         raise ValueError(f"missing required fixture operations: {set(REQUIRED) - seen}")
     if len(data["scenarios"]) != 9 or "not-found" not in ids or "echo-too-large" not in ids:
-        raise ValueError("not-found and all 4 binary echo cases are required")
+        raise ValueError("not-found, the 4 valid binary echoes, and oversize rejection are required")
     repeats = {x.get("payload", {}).get("repeat") for x in data["scenarios"] if x["method"] == "POST"}
     if repeats != {0, 4, 256, 4096, 4097}:
         raise ValueError(f"binary echo fixtures missing expected lengths: {repeats}")

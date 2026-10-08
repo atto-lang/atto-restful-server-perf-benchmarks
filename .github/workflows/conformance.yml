@@ -100,7 +100,9 @@ jobs:
         run: python3 -m pip install --user jsonschema==4.25.1
       - name: Capture Maven Vert.x dependency graph
         working-directory: src/java/vertx
-        run: mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock
+        run: |
+          mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock
+          git diff --exit-code -- dependency-tree.lock
       - name: Export Vert.x dependency graph
         run: python3 scripts/export_lockfile.py src/java/vertx/dependency-tree.lock
       - name: HTTP conformance (Vert.x)
@@ -121,7 +123,9 @@ jobs:
         run: python3 -m pip install --user jsonschema==4.25.1
       - name: Capture Maven Akka dependency graph
         working-directory: src/scala/akka
-        run: mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock
+        run: |
+          mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock
+          git diff --exit-code -- dependency-tree.lock
       - name: Export Akka dependency graph
         run: python3 scripts/export_lockfile.py src/scala/akka/dependency-tree.lock
       - name: HTTP conformance (Akka)
@@ -150,5 +154,5 @@ jobs:
       - name: HTTP conformance (Phoenix)
         run: python3 scripts/conformance.py -- bash src/erlang/phoenix/run.sh
 
-# Spin requires authenticated checkout of private upstream trees and pinned compiler;
-# source equivalence above is not sufficient to claim runtime conformance.
+# Spin runtime validated separately via a private, exact Git-blob CI mirror.
+# See docs/VERIFICATION.md. Local source parity is not runtime proof.

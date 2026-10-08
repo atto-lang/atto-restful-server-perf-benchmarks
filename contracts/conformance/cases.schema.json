@@ -17,11 +17,12 @@
     },
     "scenarios": {
       "type": "array",
-      "minItems": 8,
+      "minItems": 9,
       "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/case"
-      }
+      },
+      "maxItems": 9
     }
   },
   "$defs": {
