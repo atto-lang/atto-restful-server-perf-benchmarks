@@ -40,7 +40,7 @@ def run():
     cases = [
         ("GET", "/health", 200, "application/json", b'{"status":"ok"}'),
         ("GET", "/plaintext", 200, "text/plain; charset=utf-8", b"hello, world!"),
-        ("GET", "/json", 200, "application/json", b'{"message":"hello, world!"}"),
+        ("GET", "/json", 200, "application/json", b'{"message":"hello, world!"}'),
     ]
     checks = 0
     for method,path,status,mime,body in cases:
