@@ -22,9 +22,22 @@ class FixtureServer(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         if self.server.behavior == "duplicate-header" and self.path == "/json":
             self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
+        behavior = self.server.behavior if self.path == "/json" else "normal"
+        if behavior == "oversize-stream":
+            body = b"x" * (1_048_576 + 1)
+            self.send_header("Connection", "close")
+            self.close_connection = True
+        elif behavior == "oversize-length":
+            self.send_header("Content-Length", "1048577")
+        elif behavior == "signed-length":
+            self.send_header("Content-Length", "+" + str(len(body)))
+        else:
+            self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def do_GET(self):
         responses = {
@@ -88,6 +101,14 @@ class RunnerRegressionTests(unittest.TestCase):
         code, report = self.run_probe("duplicate-header")
         self.assertEqual(code, 1)
         self.assertTrue(any("duplicate content-type" in err for err in report["failures"]))
+
+    def test_excessive_response_body_and_invalid_length_rejected(self):
+        for behavior in ("oversize-stream", "oversize-length", "signed-length"):
+            with self.subTest(behavior=behavior):
+                code, report = self.run_probe(behavior)
+                self.assertEqual(code, 1)
+                expected = "invalid Content-Length" if behavior == "signed-length" else "response byte budget"
+                self.assertTrue(any(expected in err for err in report["failures"]), report)
 
     def test_corrupted_binary_echo_rejected(self):
         code, report = self.run_probe("bad-echo")

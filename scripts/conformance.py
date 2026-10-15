@@ -27,6 +27,7 @@ if not 1 <= args.port <= 65535 or args.timeout <= 0:
     parser.error("invalid port or timeout")
 command = args.command[1:] if args.command[:1] == ["--"] else args.command
 proc = None
+MAX_RESPONSE_BYTES = 1_048_576
 
 
 def payload_for(case):
@@ -54,14 +55,22 @@ def request(method, path, payload=None, conn=None):
         headers_out = {k.lower(): v for k, v in pairs}
         if "content-length" in headers_out and "transfer-encoding" in headers_out:
             raise AssertionError(f"{method} {path}: ambiguous response framing")
-        raw = r.read()
+        claimed = None
         if "content-length" in headers_out:
-            try:
-                claimed = int(headers_out["content-length"])
-            except ValueError as exc:
-                raise AssertionError(f"{method} {path}: invalid Content-Length") from exc
-            if claimed < 0 or claimed != len(raw):
-                raise AssertionError(f"{method} {path}: Content-Length/body mismatch")
+            text_length = headers_out["content-length"]
+            if (not text_length or len(text_length) > 8 or
+                    not text_length.isascii() or not text_length.isdigit()):
+                raise AssertionError(f"{method} {path}: invalid Content-Length")
+            claimed = int(text_length)
+            if claimed > MAX_RESPONSE_BYTES:
+                raise AssertionError(f"{method} {path}: response byte budget exceeded")
+        if headers_out.get("transfer-encoding", "chunked").lower() != "chunked":
+            raise AssertionError(f"{method} {path}: unsupported Transfer-Encoding")
+        raw = r.read(MAX_RESPONSE_BYTES + 1)
+        if len(raw) > MAX_RESPONSE_BYTES:
+            raise AssertionError(f"{method} {path}: response byte budget exceeded")
+        if claimed is not None and claimed != len(raw):
+            raise AssertionError(f"{method} {path}: Content-Length/body mismatch")
         return r.status, headers_out, raw
     finally:
         if owned:
