@@ -55,7 +55,7 @@ def validate(d):
                 f"exact Git object ID required: {key}")
     for key in ("artifactSha256", "logSha256"):
         require(d[key] == "" or digest(d[key]), f"invalid {key}")
-    require(type(d["toolchain"]) is str and 0 < len(d["toolchain"].strip()) <= 256, "toolchain provenance required")
+    require(type(d["toolchain"]) is str and 0 < len(d["toolchain"].strip()) and len(d["toolchain"]) <= 256, "toolchain provenance required")
     require(type(d["runs"]) is int and 0 <= d["runs"] <= 100000, "invalid independent runs")
     require(type(d["correctness"]) is str and d["correctness"] in {"PASS", "FAIL", "NOT_RUN"}, "correctness status")
     metric = d["metric"]
@@ -85,6 +85,9 @@ def validate(d):
                         "hardware metric/unit pair")
                 require(not (target == "asic" and stage == "GENERIC_SYNTH"),
                         "generic synthesis cannot report physical PPA")
+                require(not (target == "asic" and stage == "CELL_MAPPED" and
+                             metric["name"] != "cell_area"),
+                        "cell-mapped evidence cannot claim routed timing or power")
                 require(not (target == "fpga" and stage == "SYNTH_ONLY" and
                              metric["name"] in ("fmax", "estimated_power")),
                         "synthesis-only evidence cannot claim routing measurements")
