@@ -38,8 +38,8 @@ def validate(data):
     require(type(data["schema_version"]) is int and data["schema_version"] == 1,
             "unsupported evidence version")
     target, stage = data["target"], data["stage"]
-    require(target in SOFTWARE | HARDWARE, "unknown target")
-    require(stage in STAGES, "unknown evidence stage")
+    require(type(target) is str and target in SOFTWARE | HARDWARE, "unknown target")
+    require(type(stage) is str and stage in STAGES, "unknown evidence stage")
     require(isinstance(data["source_commit"], str) and
             GIT_SHA.fullmatch(data["source_commit"]), "exact source commit required")
     require(isinstance(data["workload_sha256"], str) and
