@@ -58,5 +58,12 @@ class OptimizationEvidenceTests(unittest.TestCase):
   self.fail_if_accepted(metrics={"p50_ms":True})
 
 
+ def test_oversized_integer_rejects_cleanly(self):
+  self.fail_if_accepted(metrics={"p50_ms":10**1000})
+
+ def test_zero_board_measurement_still_requires_board_stage(self):
+  self.fail_if_accepted(target="fpga-rtl",stage="PLACED_ROUTED",reason="",
+   correctness_passed=True,artifacts={"pnr_log":"c"*64},metrics={"board_measured_ops_per_sec":0})
+
 if __name__=="__main__":
  unittest.main()

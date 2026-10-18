@@ -29,7 +29,7 @@ def require(ok, message):
 
 
 def nonneg_number(value):
-    return type(value) in (int, float) and math.isfinite(value) and value >= 0
+    return type(value) in (int, float) and 0 <= value <= sys.float_info.max and math.isfinite(value)
 
 
 def validate(data):
@@ -87,7 +87,7 @@ def validate(data):
     elif stage == "PLACED_ROUTED":
         require(target == "fpga-rtl" and "pnr_log" in artifacts,
                 "FPGA P&R requires placed-and-routed evidence")
-        require(not metrics.get("board_measured_ops_per_sec"),
+        require("board_measured_ops_per_sec" not in metrics,
                 "P&R report is not a board measurement")
     elif stage == "ASIC_PPA_ESTIMATE":
         require(target == "asic-rtl" and {"mapped_netlist", "timing_log"} <= artifacts.keys(),
