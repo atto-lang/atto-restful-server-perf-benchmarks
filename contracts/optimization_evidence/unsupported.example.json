@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "target": "graal-native-pgo",
+  "stage": "UNSUPPORTED",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "workload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "toolchain": "GraalVM Native Image - replace with verified version",
+  "flags": [
+    "-O2"
+  ],
+  "correctness_passed": false,
+  "repetitions": 0,
+  "metrics": {},
+  "artifacts": {},
+  "reason": "illustrative template only, not a real runtime probe"
+}
