@@ -74,7 +74,7 @@ def validate(d):
             require(type(metric) is dict and set(metric) == {"name", "value", "unit"},
                     "metric must include name, finite value and unit")
             value = metric["value"]
-            require(type(value) in (int, float) and math.isfinite(value) and value > 0,
+            require(type(value) in (int, float) and 0 < value <= sys.float_info.max and math.isfinite(value),
                     "performance metrics must be finite, positive and non-synthetic")
             if target in SOFTWARE:
                 require((metric["name"], metric["unit"]) in {("throughput", "requests/s"),
