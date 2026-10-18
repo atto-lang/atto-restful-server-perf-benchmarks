@@ -42,6 +42,14 @@ class AdmissionTests(unittest.TestCase):
         self.reject(metric={"name":"latency","value":1,"unit":"requests/s"})
         self.reject(metric={"name":"throughput","value":0,"unit":"requests/s"})
 
+    def test_unbounded_numbers_and_toolchain_names(self):
+        self.reject(metric={"name":"throughput","value":2**4096,"unit":"requests/s"})
+        self.reject(toolchain="x"*300)
+
+    def test_asic_mapped_stage_cannot_claim_routed_frequency(self):
+        self.reject(target="asic",stage="CELL_MAPPED",
+                    metric={"name":"fmax","value":1000,"unit":"Hz"})
+
     def test_outcome_consistency(self):
         self.reject(status="UNSUPPORTED",correctness="FAIL",runs=0,metric=None)
         self.reject(status="NOT_RUN",correctness="FAIL",runs=0,metric=None)
