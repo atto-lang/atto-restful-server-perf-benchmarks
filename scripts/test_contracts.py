@@ -77,6 +77,41 @@ class ContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "status codes"):
             check_openapi(doc)
 
+    def test_duplicate_canonical_ids_cannot_be_relabelled_into_success(self):
+        cases = copy.deepcopy(load_cases())
+        scenarios = cases["scenarios"]
+        scenarios[1]["id"] = scenarios[0]["id"]
+        with self.assertRaisesRegex(ValueError, "exact nine canonical IDs"):
+            validate_fixture_semantics(cases)
+
+    def test_unmodelled_get_request_payload_must_be_rejected(self):
+        cases = copy.deepcopy(load_cases())
+        health = next(c for c in cases["scenarios"] if c["id"] == "health")
+        health["payload"] = {"byteRange": 256, "repeat": 0}
+        with self.assertRaisesRegex(ValueError, "unexpected request body"):
+            validate_fixture_semantics(cases)
+
+    def test_openapi_inclusion_flag_is_exact(self):
+        cases = copy.deepcopy(load_cases())
+        probe = next(c for c in cases["scenarios"] if c["id"] == "not-found")
+        probe["inOpenApi"] = True
+        with self.assertRaisesRegex(ValueError, "OpenAPI inclusion"):
+            validate_fixture_semantics(cases)
+
+    def test_oversized_echo_must_retain_canonical_binary_boundary(self):
+        cases = copy.deepcopy(load_cases())
+        oversized = next(c for c in cases["scenarios"] if c["id"] == "echo-too-large")
+        oversized["payload"]["byteRange"] = 128
+        with self.assertRaisesRegex(ValueError, "binary boundary fixture"):
+            validate_fixture_semantics(cases)
+
+    def test_status_and_media_type_are_bound_to_each_named_probe(self):
+        cases = copy.deepcopy(load_cases())
+        health = next(c for c in cases["scenarios"] if c["id"] == "health")
+        health["expected"]["headers"]["content-type"] = "text/plain"
+        with self.assertRaisesRegex(ValueError, "media type"):
+            validate_fixture_semantics(cases)
+
 
 if __name__ == "__main__":
     unittest.main()
