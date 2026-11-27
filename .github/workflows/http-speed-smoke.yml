@@ -1,5 +1,7 @@
 name: Five-language HTTP speed smoke
 on:
+  push:
+    branches: ['feat/spin-five-language-smoke-benchmark-20261126']
   pull_request:
     paths:
       - scripts/http-speed.mjs
@@ -37,6 +39,8 @@ jobs:
           (cd src/erlang/otp && rebar3 compile)
           git diff --exit-code -- src/golang/gin/go.mod src/golang/gin/go.sum src/rust/axum/Cargo.lock src/erlang/otp/rebar.lock
       - name: Build historical Spin guest compiler and router
+        id: spin-build
+        continue-on-error: true
         run: |
           set -euxo pipefail
           git clone --no-checkout https://github.com/atto-lang/atto-spin.git "$RUNNER_TEMP/spin"
@@ -49,10 +53,17 @@ jobs:
           test "$(tr -d '[:space:]' < "$RUNNER_TEMP/spin/SOURCE_REF")" = "$(git -C "$RUNNER_TEMP/compiler" rev-parse HEAD)"
           (cd "$RUNNER_TEMP/compiler" && mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
       - name: Same-host sequential smoke (not ranking evidence)
+        if: steps.spin-build.outcome == 'success'
         run: |
           export ORESLANG_SPIN_DIR="$RUNNER_TEMP/spin"
           export ORESLANG_SOURCE_DIR="$RUNNER_TEMP/compiler"
           node scripts/http-speed.mjs smoke results/http-speed-smoke
+      - name: Reference-only smoke if Spin compilation failed
+        if: steps.spin-build.outcome == 'failure'
+        run: node scripts/http-speed.mjs smoke results/http-speed-smoke js-nodejs golang-gin rust-axum erlang-otp
+      - name: Fail closed if Spin could not build
+        if: always() && steps.spin-build.outcome != 'success'
+        run: exit 1
       - name: Preserve receipts even on failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

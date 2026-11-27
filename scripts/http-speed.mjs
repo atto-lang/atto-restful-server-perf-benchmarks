@@ -4,6 +4,7 @@ import net from 'node:net';
 import {spawn, spawnSync, execFileSync} from 'node:child_process';
 import {mkdirSync, openSync, closeSync, appendFileSync, writeFileSync, readFileSync} from 'node:fs';
 import {resolve, join} from 'node:path';
+import {createHash} from 'node:crypto';
 import os from 'node:os';
 import {performance} from 'node:perf_hooks';
 import {setTimeout as sleep} from 'node:timers/promises';
@@ -25,11 +26,15 @@ const selected = chosen.length ? chosen : Object.keys(targets);
 const config = profile === 'smoke'
   ? {warmup: 1, duration: 2, trials: 1, concurrency: [1,8], reuse: [true]}
   : {warmup: 30, duration: 60, trials: 5, concurrency: [1,8,32,128], reuse: [true,false]};
+if (process.platform !== 'linux' && process.platform !== 'darwin') throw Error('POSIX process groups required');
+const dirty = execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).trim();
+if (dirty) throw Error('tracked benchmark source differs from HEAD');
+const fixtureHash = createHash('sha256').update(readFileSync('contracts/conformance/cases.json')).digest('hex');
 const root = resolve(output);
 mkdirSync(root); // Never overwrite earlier measurements.
 const sha = dir => execFileSync('git',['rev-parse','HEAD'],{cwd:dir,encoding:'utf8'}).trim();
 const version = (cmd,args) => {
-  try {return execFileSync(cmd,args,{encoding:'utf8',timeout:10000,stdio:['ignore','pipe','pipe']}).trim();}
+  try {const r=spawnSync(cmd,args,{encoding:'utf8',timeout:10000});return r.status===0 ? [r.stdout,r.stderr].filter(Boolean).join('\n').trim() : null;}
   catch {return null;}
 };
 const spinDir = process.env.ORESLANG_SPIN_DIR;
@@ -44,7 +49,9 @@ const environment = {source_sha:sha('.'), profile, config, selected,
   ram_bytes:os.totalmem(), node:process.version, go:version('go',['version']),
   rust:version('rustc',['-V']), erlang:version('erl',['-noshell','-eval','io:format("~s", [erlang:system_info(otp_release)]), halt().']),
   java:version('java',['-XshowSettings:properties','-version']),
-  java_home:process.env.JAVA_HOME ?? null, spin_pins:spinPins,
+  java_home:process.env.JAVA_HOME ?? null, spin_pins:spinPins, contract_sha256:fixtureHash,
+  java_tool_options:process.env.JAVA_TOOL_OPTIONS ?? null, gomaxprocs:process.env.GOMAXPROCS ?? null,
+  node_options:process.env.NODE_OPTIONS ?? null,
   ci:process.env.GITHUB_RUN_ID ?? null, topology:'single-host loopback; client shares CPU with server',
   latency_model:'closed-loop; one outstanding request per worker; coordinated omission possible',
   cpu_rss:'not sampled in this initial runner', ranking_eligible:false};
@@ -64,7 +71,7 @@ function request(s,agent) {
     const start=performance.now();
     let settled=false;
     let timer;
-    const finish=(error)=>{if(!settled){settled=true;clearTimeout(timer);resolve({error,ms:performance.now()-start});}};
+    const finish=(error)=>{if(!settled){settled=true;clearTimeout(timer);resolve({error,ms:performance.now()-start,reused:req.reusedSocket===true});}};
     const req=http.request({hostname:'127.0.0.1',port:8080,path:s.path,method:s.method,agent,
       headers:{'Accept-Encoding':'identity',...(s.body?{'Content-Type':'application/octet-stream','Content-Length':s.body.length}:{})}},
     res=>{
@@ -94,20 +101,20 @@ async function occupied() {
   });
 }
 async function phase(s, concurrency, seconds, reuse) {
-  const agent=new http.Agent({keepAlive:reuse,maxSockets:concurrency,maxFreeSockets:concurrency});
+  const agent=reuse ? new http.Agent({keepAlive:true,maxSockets:concurrency,maxFreeSockets:concurrency}) : false;
   // 0.1 ms histogram, bounded at the request timeout (overflow reported).
   const hist=new Uint32Array(100001);
-  const errors={}; let ok=0, overflow=0;
+  const errors={}; let ok=0, overflow=0, reused=0;
   const start=performance.now(), deadline=start+seconds*1000;
   try {
     await Promise.all(Array.from({length:concurrency},async()=>{
       while(performance.now()<deadline){
         const result=await request(s,agent);
         if(result.error) errors[result.error]=(errors[result.error]??0)+1;
-        else {ok++;const bucket=Math.ceil(result.ms*10);if(bucket>=hist.length)overflow++;else hist[bucket]++;}
+        else {ok++;if(result.reused)reused++;const bucket=Math.ceil(result.ms*10);if(bucket>=hist.length)overflow++;else hist[bucket]++;}
       }
     }));
-  } finally {agent.destroy();}
+  } finally {if(agent)agent.destroy();}
   const elapsed=(performance.now()-start)/1000;
   const quantile=p=>{
     if(!ok)return null;
@@ -117,7 +124,7 @@ async function phase(s, concurrency, seconds, reuse) {
   const failed=Object.values(errors).reduce((a,b)=>a+b,0);
   return {requested_seconds:seconds,elapsed_seconds:elapsed,requests_ok:ok,requests_failed:failed,
     errors,throughput_rps:ok/elapsed,latency_ms:{p50:quantile(.5),p95:quantile(.95),p99:quantile(.99)},
-    histogram_overflow:overflow,valid:ok>0&&failed===0&&overflow===0};
+    histogram_overflow:overflow,reused_requests:reused,valid:ok>0&&failed===0&&overflow===0&&(reuse?reused>0:reused===0)};
 }
 let active=null;
 function signalGroup(child,signal) {
@@ -149,13 +156,13 @@ for(const target of selected){
     writeFileSync(join(root,target+'.conformance.log'),(conformance.stdout??'')+'\n'+(conformance.stderr??''));
     if(conformance.error || conformance.status!==0)throw Error('HTTP conformance failed');
     const receipt=JSON.parse(conformance.stdout.trim());
-    if(receipt.passed!==true||receipt.checks!==36||receipt.failures.length)throw Error('incomplete HTTP conformance receipt');
+    if(receipt.passed!==true||receipt.checks!==36||receipt.failures.length||receipt.target!==target||receipt.contract_sha256!==fixtureHash)throw Error('incomplete HTTP conformance receipt');
     for(const s of scenarios)for(const reuse of config.reuse)for(const concurrency of config.concurrency)for(let trial=1;trial<=config.trials;trial++){
       if(child.exitCode!==null||child.signalCode!==null)throw Error('server stopped');
       const warmup=await phase(s,concurrency,config.warmup,reuse);
       const measured=await phase(s,concurrency,config.duration,reuse);
       const row={target,source_sha:environment.source_sha,scenario:s.id,concurrency,keep_alive:reuse,trial,
-        startup_ms,warmup,measurement:measured,valid:warmup.valid&&measured.valid,
+        startup_ms,warmup,measurement:measured,valid:warmup.valid&&measured.valid&&child.exitCode===null&&child.signalCode===null,
         contract_sha256:receipt.contract_sha256,profile,ranking_eligible:false};
       appendFileSync(raw,JSON.stringify(row)+'\n');
       console.log(JSON.stringify(row));

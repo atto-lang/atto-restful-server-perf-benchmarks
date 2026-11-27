@@ -35,3 +35,5 @@ resource isolation, generator headroom, repeatability, CPU/RSS sampling and
 runtime/compiler flags are independently established. Hosted runner smoke
 results are only for diagnostics. Pooled Spin, current canonical Atto guest
 and native compiler tiers need separate exact-pin adapters and validation.
+
+Audit additions: verify tracked source matches HEAD and the conformance receipt's target and fixture hash; record actual socket reuse and reject samples that contradict the requested connection mode. A failed historical Spin build allows separately labeled reference-only smoke artifacts, but fails the overall job. No reference-only run is a five-language comparison.
