@@ -6,6 +6,8 @@ on:
     paths:
       - 'src/oreslang/spin/run-current.sh'
       - 'src/oreslang/spin/server_current.atto'
+      - 'src/oreslang/spin/stage-current.mjs'
+      - 'src/oreslang/spin/test-stage-current.mjs'
       - 'scripts/check-spin-worker-reuse.mjs'
       - 'scripts/spin-worker-proof.mjs'
       - 'scripts/test-spin-worker-proof.mjs'
@@ -46,6 +48,7 @@ jobs:
       - name: Host regressions
         run: |
           bash -n src/oreslang/spin/run-current.sh
+          node --test src/oreslang/spin/test-stage-current.mjs
           node --check scripts/check-spin-worker-reuse.mjs
           node --test scripts/test-http-speed-client.mjs scripts/test-http-speed-receipt.mjs scripts/test-spin-worker-proof.mjs scripts/test-spin-worker-http.mjs scripts/test-spin-lifecycle-receipt.mjs
       - name: Same-pin paired lifecycle smoke (not ranking evidence)
