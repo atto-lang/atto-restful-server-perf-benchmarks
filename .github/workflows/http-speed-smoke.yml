@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - scripts/http-speed.mjs
+      - scripts/http-speed-client.mjs
+      - scripts/test-http-speed-client.mjs
       - .github/workflows/http-speed-smoke.yml
   workflow_dispatch:
 permissions:
@@ -34,6 +36,7 @@ jobs:
         run: |
           node --check scripts/http-speed.mjs
           node scripts/test-http-speed-connection-mode.mjs
+          node --test scripts/test-http-speed-client.mjs
           python3 -m pip install --user jsonschema==4.25.1
           (cd src/golang/gin && go build -mod=readonly -o server .)
           (cd src/rust/axum && cargo build --release --locked)

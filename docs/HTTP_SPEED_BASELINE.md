@@ -37,3 +37,5 @@ results are only for diagnostics. Pooled Spin, current canonical Atto guest
 and native compiler tiers need separate exact-pin adapters and validation.
 
 Audit additions: verify tracked source matches HEAD and the conformance receipt's target and fixture hash; record actual socket reuse and reject samples that contradict the requested connection mode. A failed historical Spin build allows separately labeled reference-only smoke artifacts, but fails the overall job. No reference-only run is a five-language comparison.
+
+The timed client now lives in `scripts/http-speed-client.mjs`; `node --test scripts/test-http-speed-client.mjs` exercises that same module with real loopback HTTP servers. It rejects unexpected encoding, status, MIME, payload length/bytes, deadline failures, and keep-alive phases without reuse. These are host client regressions, not guest compiler or performance qualification.
