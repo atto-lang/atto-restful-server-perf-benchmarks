@@ -2,6 +2,7 @@
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {summarizeWorkers} from './spin-worker-proof.mjs';
 export const targets = ['js-nodejs','golang-gin','rust-axum','erlang-otp','spin-legacy-jvm-shared','spin-legacy-jvm-isolated'];
 export const currentTargets=['spin-current-jvm-shared-fresh','spin-current-jvm-shared-pooled','spin-current-jvm-isolated-fresh','spin-current-jvm-isolated-pooled'];
 export const profiles = {
@@ -24,7 +25,7 @@ function checkPhase(p,seconds,reuse){
   const {p50,p95,p99}=p.latency_ms??{};
   ensure([p50,p95,p99].every(x=>finite(x)&&x>=0)&&p50<=p95&&p95<=p99,'invalid latency distribution');
 }
-export function validateReceipt(env,rows,{expectedTargets=targets,expectedSha,expectedContract}={}){
+export function validateReceipt(env,rows,{expectedTargets=targets,expectedSha,expectedContract,workerProofs={}}={}){
   ensure(env&&sha(env.source_sha)&&digest(env.contract_sha256)&&env.ranking_eligible===false,'invalid environment provenance');
   if(expectedSha!==undefined)ensure(env.source_sha===expectedSha,'source SHA mismatch');
   if(expectedContract!==undefined)ensure(env.contract_sha256===expectedContract,'contract SHA mismatch');
@@ -33,6 +34,11 @@ export function validateReceipt(env,rows,{expectedTargets=targets,expectedSha,ex
   const c=profiles[env.profile];ensure(c&&same(env.config,c),'profile/config mismatch');
   if(expectedTargets.some(t=>t.startsWith('spin-current-')))ensure(env.spin_pins?.spin==='66662e7b8977283c357bcc7c21601547953baa49'&&env.spin_pins?.compiler==='e6098659c2e1641564bb5835b4dbb92a6a00b1a8'&&env.spin_pins?.routing==='4c28fe37178f52ebe4bd504d608ff42215f1ec48','current Spin pin mismatch');
   if(expectedTargets.some(t=>t.startsWith('spin-legacy-')))ensure(env.spin_pins?.spin==='8f29b2f75f13beb3e03357e6b15839129c33d72b'&&env.spin_pins?.compiler==='3f709fbf59abb2c13313725d2d648e6b560b17b8'&&env.spin_pins?.routing==='41b2cbff35be3cb5dca7d33fe30c3892498f9b75','historical Spin pin mismatch');
+  for(const t of expectedTargets.filter(t=>currentTargets.includes(t))){
+    const p=workerProofs[t];ensure(p&&Array.isArray(p.samples),'missing worker proof');
+    const summary=summarizeWorkers(p.samples,t.includes('-isolated-')?'isolated':'shared',t.endsWith('-pooled')?'pooled':'fresh');
+    ensure(same(p.summary,summary),'worker summary mismatch');
+  }
   const key=(t,s,n,k,i)=>JSON.stringify([t,s,n,k,i]);
   const remaining=new Set();
   for(const t of expectedTargets)for(const s of scenarios)for(const n of c.concurrency)for(const k of c.reuse)for(let i=1;i<=c.trials;i++)remaining.add(key(t,s,n,k,i));
@@ -52,5 +58,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   ensure(dir&&sha(expectedSha)&&digest(expectedContract),'usage: node http-speed-receipt.mjs DIRECTORY EXPECTED_SHA CONTRACT_SHA [target ...]');
   const env=JSON.parse(readFileSync(join(dir,'environment.json'),'utf8'));
   const rows=readFileSync(join(dir,'trials.jsonl'),'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
-  console.log(JSON.stringify(validateReceipt(env,rows,{expectedSha,expectedContract,expectedTargets:selected.length?selected:targets})));
+  const expectedTargets=selected.length?selected:targets;
+  const workerProofs=Object.fromEntries(expectedTargets.filter(t=>currentTargets.includes(t)).map(t=>[t,JSON.parse(readFileSync(join(dir,t+'.worker-reuse.json'),'utf8'))]));
+  console.log(JSON.stringify(validateReceipt(env,rows,{expectedSha,expectedContract,expectedTargets,workerProofs})));
 }

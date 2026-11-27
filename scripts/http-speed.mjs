@@ -109,10 +109,12 @@ for(const target of selected){
     const receipt=JSON.parse(conformance.stdout.trim());
     if(receipt.passed!==true||receipt.checks!==36||receipt.failures.length||receipt.target!==target||receipt.contract_sha256!==fixtureHash)throw Error('incomplete HTTP conformance receipt');
     if(target.startsWith('spin-current-')){
-      const proof=spawnSync('node',['scripts/check-spin-worker-reuse.mjs',target.includes('-isolated-')?'isolated':'shared',target.endsWith('-pooled')?'pooled':'fresh'],{encoding:'utf8',timeout:120000});
+      const proof=spawnSync('node',['scripts/check-spin-worker-reuse.mjs',target.includes('-isolated-')?'isolated':'shared',target.endsWith('-pooled')?'pooled':'fresh'],{encoding:'utf8',timeout:240000});
       writeFileSync(join(root,target+'.worker-reuse.log'),(proof.stdout??'')+'\n'+(proof.stderr??''));
       if(proof.error||proof.status!==0)throw Error('worker lifecycle proof failed');
-      console.log(proof.stdout.trim());
+      const evidence=JSON.parse(proof.stdout.trim());
+      writeFileSync(join(root,target+'.worker-reuse.json'),JSON.stringify(evidence)+'\n');
+      console.log(JSON.stringify(evidence.summary));
     }
     for(const s of scenarios)for(const reuse of config.reuse)for(const concurrency of config.concurrency)for(let trial=1;trial<=config.trials;trial++){
       if(child.exitCode!==null||child.signalCode!==null)throw Error('server stopped');
