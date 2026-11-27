@@ -4,6 +4,8 @@ import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {summarizeWorkers} from './spin-worker-proof.mjs';
 export const targets = ['js-nodejs','golang-gin','rust-axum','erlang-otp','spin-legacy-jvm-shared','spin-legacy-jvm-isolated'];
+export const extraReferenceTargets=['java-vertx'];
+export const comparisonTargets=['js-nodejs','golang-gin','java-vertx','rust-axum','spin-current-jvm-shared-pooled','spin-current-jvm-isolated-pooled'];
 export const currentTargets=['spin-current-jvm-shared-fresh','spin-current-jvm-shared-pooled','spin-current-jvm-isolated-fresh','spin-current-jvm-isolated-pooled'];
 export const profiles = {
   smoke:{warmup:1,duration:2,trials:1,concurrency:[1,8],reuse:[true]},
@@ -29,7 +31,7 @@ export function validateReceipt(env,rows,{expectedTargets=targets,expectedSha,ex
   ensure(env&&sha(env.source_sha)&&digest(env.contract_sha256)&&env.ranking_eligible===false,'invalid environment provenance');
   if(expectedSha!==undefined)ensure(env.source_sha===expectedSha,'source SHA mismatch');
   if(expectedContract!==undefined)ensure(env.contract_sha256===expectedContract,'contract SHA mismatch');
-  ensure(Array.isArray(expectedTargets)&&expectedTargets.length>0&&new Set(expectedTargets).size===expectedTargets.length&&expectedTargets.every(t=>targets.includes(t)||currentTargets.includes(t)),'invalid expected targets');
+  ensure(Array.isArray(expectedTargets)&&expectedTargets.length>0&&new Set(expectedTargets).size===expectedTargets.length&&expectedTargets.every(t=>targets.includes(t)||extraReferenceTargets.includes(t)||currentTargets.includes(t)),'invalid expected targets');
   ensure(same(env.selected,expectedTargets),'target selection mismatch');
   const c=profiles[env.profile];ensure(c&&same(env.config,c),'profile/config mismatch');
   if(expectedTargets.some(t=>t.startsWith('spin-current-')))ensure(env.spin_pins?.spin==='66662e7b8977283c357bcc7c21601547953baa49'&&env.spin_pins?.compiler==='e6098659c2e1641564bb5835b4dbb92a6a00b1a8'&&env.spin_pins?.routing==='4c28fe37178f52ebe4bd504d608ff42215f1ec48','current Spin pin mismatch');
