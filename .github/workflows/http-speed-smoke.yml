@@ -6,6 +6,8 @@ on:
     paths:
       - scripts/http-speed.mjs
       - scripts/http-speed-client.mjs
+      - scripts/http-speed-receipt.mjs
+      - scripts/test-http-speed-receipt.mjs
       - scripts/test-http-speed-client.mjs
       - .github/workflows/http-speed-smoke.yml
   workflow_dispatch:
@@ -36,7 +38,7 @@ jobs:
         run: |
           node --check scripts/http-speed.mjs
           node scripts/test-http-speed-connection-mode.mjs
-          node --test scripts/test-http-speed-client.mjs
+          node --test scripts/test-http-speed-client.mjs scripts/test-http-speed-receipt.mjs
           python3 -m pip install --user jsonschema==4.25.1
           (cd src/golang/gin && go build -mod=readonly -o server .)
           (cd src/rust/axum && cargo build --release --locked)
@@ -62,9 +64,12 @@ jobs:
           export ORESLANG_SPIN_DIR="$RUNNER_TEMP/spin"
           export ORESLANG_SOURCE_DIR="$RUNNER_TEMP/compiler"
           node scripts/http-speed.mjs smoke results/http-speed-smoke
+          node scripts/http-speed-receipt.mjs results/http-speed-smoke "$(git rev-parse HEAD)" "$(sha256sum contracts/conformance/cases.json | cut -d' ' -f1)"
       - name: Reference-only smoke if Spin compilation failed
         if: steps.spin-build.outcome == 'failure'
-        run: node scripts/http-speed.mjs smoke results/http-speed-smoke js-nodejs golang-gin rust-axum erlang-otp
+        run: |
+          node scripts/http-speed.mjs smoke results/http-speed-smoke js-nodejs golang-gin rust-axum erlang-otp
+          node scripts/http-speed-receipt.mjs results/http-speed-smoke "$(git rev-parse HEAD)" "$(sha256sum contracts/conformance/cases.json | cut -d' ' -f1)" js-nodejs golang-gin rust-axum erlang-otp
       - name: Fail closed if Spin could not build
         if: always() && steps.spin-build.outcome != 'success'
         run: exit 1

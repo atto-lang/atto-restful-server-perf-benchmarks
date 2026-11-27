@@ -44,6 +44,8 @@ jobs:
         with:
           node-version: "22"
       - run: node --check src/js/nodejs/server.mjs
+      - name: HTTP benchmark client and receipt regression suite
+        run: node --test scripts/test-http-speed-client.mjs scripts/test-http-speed-receipt.mjs
       - name: Exercise Bun/Deno handlers under Node's Web API mocks
         run: node --test scripts/test_native_js.mjs
       - name: Install contract validator
