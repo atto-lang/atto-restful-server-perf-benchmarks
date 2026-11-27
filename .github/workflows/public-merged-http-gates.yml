@@ -1,0 +1,40 @@
+name: Public merged HTTP regression qualification
+on:
+  push:
+    branches: ['ci/public-merged-http-gates-20261127']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  merged-http-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify public JS merged commit and tree; run both frontend gates
+        run: |
+          set -euxo pipefail
+          mkdir -p "$RUNNER_TEMP/js-http"
+          cd "$RUNNER_TEMP/js-http"
+          git init .
+          git fetch --depth=1 https://github.com/atto-lang/atto-source.js.git 5e0e7ae8fc899c01e8d2e0103ce51e7b613e2a23
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = 5e0e7ae8fc899c01e8d2e0103ce51e7b613e2a23
+          test "$(git rev-parse HEAD^{tree})" = 29c02ff4a8b0dd582f318b695ac54f3f0785db4a
+          test -z "$(git status --porcelain --untracked-files=all)"
+          node --test tests/http-actor-fixture-pins.test.mjs tests/http-actor-admission.test.mjs
+      - name: Verify public LLVM merged commit and tree; run subprocess harness tests
+        if: always()
+        run: |
+          set -euxo pipefail
+          mkdir -p "$RUNNER_TEMP/llvm-http"
+          cd "$RUNNER_TEMP/llvm-http"
+          git init .
+          git fetch --depth=1 https://github.com/atto-lang/atto-source.llvm.git cc63882e5dc30c4bd5cb8bccac000f7396b6ecd9
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = cc63882e5dc30c4bd5cb8bccac000f7396b6ecd9
+          test "$(git rev-parse HEAD^{tree})" = 7bc97ee0581930d6c4e3f486521ddda68432b3ee
+          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 tests/test_native_http_startup.py -v
