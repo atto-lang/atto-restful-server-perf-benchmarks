@@ -18,6 +18,7 @@ const targets = {
   'spin-legacy-jvm-isolated': ['bash','src/oreslang/spin/run.sh','isolated'],
 };
 const historicalTargets=Object.keys(targets);
+targets['java-vertx']=['bash','src/java/vertx/run.sh'];
 for(const mode of ['shared','isolated'])for(const life of ['fresh','pooled'])targets['spin-current-jvm-'+mode+'-'+life]=['bash','src/oreslang/spin/run-current.sh',mode,life];
 const [profile, output, ...chosen] = process.argv.slice(2);
 if (!['smoke','full'].includes(profile) || !output ||

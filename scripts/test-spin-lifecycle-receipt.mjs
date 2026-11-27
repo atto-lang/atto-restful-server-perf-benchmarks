@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {validateReceipt,profiles,currentTargets} from './http-speed-receipt.mjs';
+import {validateReceipt,profiles,currentTargets,comparisonTargets} from './http-speed-receipt.mjs';
 import {routes,summarizeWorkers} from './spin-worker-proof.mjs';
 function fixture(){
   const env={source_sha:'a'.repeat(40),contract_sha256:'b'.repeat(64),profile:'smoke',config:structuredClone(profiles.smoke),selected:[...currentTargets],ranking_eligible:false,spin_pins:{spin:'66662e7b8977283c357bcc7c21601547953baa49',compiler:'e6098659c2e1641564bb5835b4dbb92a6a00b1a8',routing:'4c28fe37178f52ebe4bd504d608ff42215f1ec48'}};
@@ -30,3 +30,16 @@ for(const [name,mutate] of [
  ['wrong contract digest',f=>f.options.expectedContract='c'.repeat(64)],
  ['wrong source head',f=>f.options.expectedSha='c'.repeat(40)],
 ])test(name,()=>{const f=fixture();mutate(f);assert.throws(()=>accept(f));});
+
+function comparison(){
+  const f=fixture(),selected=[...comparisonTargets];
+  const spinRows=f.rows.filter(r=>selected.includes(r.target));
+  const template=spinRows.filter(r=>r.target===comparisonTargets[4]);
+  f.rows=[...selected.slice(0,4).flatMap(target=>template.map(r=>({...structuredClone(r),target}))),...spinRows];
+  f.env.selected=selected;f.options.expectedTargets=selected;
+  return f;
+}
+test('same-host five-language comparison with two pooled Spin modes',()=>assert.equal(accept(comparison()).trials,36));
+test('comparison rejects omission of Java reference',()=>{const f=comparison();f.rows=f.rows.filter(r=>r.target!=='java-vertx');assert.throws(()=>accept(f));});
+test('comparison rejects omission of pooled identity proof',()=>{const f=comparison();delete f.options.workerProofs[comparisonTargets[5]];assert.throws(()=>accept(f));});
+test('historical defaults unchanged and extra Java target is explicit',()=>{const f=comparison();assert.throws(()=>validateReceipt(f.env,f.rows));});
