@@ -1,0 +1,62 @@
+name: Five-language HTTP speed smoke
+on:
+  pull_request:
+    paths:
+      - scripts/http-speed.mjs
+      - .github/workflows/http-speed-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.25'
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          otp-version: '27.3'
+          rebar3-version: '3.25.1'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Build four reference stacks
+        run: |
+          node --check scripts/http-speed.mjs
+          python3 -m pip install --user jsonschema==4.25.1
+          (cd src/golang/gin && go build -mod=readonly -o server .)
+          (cd src/rust/axum && cargo build --release --locked)
+          (cd src/erlang/otp && rebar3 compile)
+          git diff --exit-code -- src/golang/gin/go.mod src/golang/gin/go.sum src/rust/axum/Cargo.lock src/erlang/otp/rebar.lock
+      - name: Build historical Spin guest compiler and router
+        run: |
+          set -euxo pipefail
+          git clone --no-checkout https://github.com/atto-lang/atto-spin.git "$RUNNER_TEMP/spin"
+          git -C "$RUNNER_TEMP/spin" checkout --detach 8f29b2f75f13beb3e03357e6b15839129c33d72b
+          git clone --no-checkout https://github.com/atto-lang/atto-http-routing.git "$RUNNER_TEMP/spin/dependencies/http-routing"
+          git -C "$RUNNER_TEMP/spin/dependencies/http-routing" checkout --detach 41b2cbff35be3cb5dca7d33fe30c3892498f9b75
+          test "$(git -C "$RUNNER_TEMP/spin" ls-tree HEAD dependencies/http-routing | awk '{print $3}')" = "$(git -C "$RUNNER_TEMP/spin/dependencies/http-routing" rev-parse HEAD)"
+          git clone --no-checkout https://github.com/atto-lang/atto-source.java.git "$RUNNER_TEMP/compiler"
+          git -C "$RUNNER_TEMP/compiler" checkout --detach 3f709fbf59abb2c13313725d2d648e6b560b17b8
+          test "$(tr -d '[:space:]' < "$RUNNER_TEMP/spin/SOURCE_REF")" = "$(git -C "$RUNNER_TEMP/compiler" rev-parse HEAD)"
+          (cd "$RUNNER_TEMP/compiler" && mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
+      - name: Same-host sequential smoke (not ranking evidence)
+        run: |
+          export ORESLANG_SPIN_DIR="$RUNNER_TEMP/spin"
+          export ORESLANG_SOURCE_DIR="$RUNNER_TEMP/compiler"
+          node scripts/http-speed.mjs smoke results/http-speed-smoke
+      - name: Preserve receipts even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: http-speed-smoke
+          path: results/http-speed-smoke/
+          if-no-files-found: warn
