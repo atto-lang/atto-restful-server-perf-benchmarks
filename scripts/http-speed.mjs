@@ -41,6 +41,8 @@ const version = (cmd,args) => {
   try {const r=spawnSync(cmd,args,{encoding:'utf8',timeout:10000});return r.status===0 ? [r.stdout,r.stderr].filter(Boolean).join('\n').trim() : null;}
   catch {return null;}
 };
+const sampleResources=process.env.ATTO_BENCH_RESOURCE_SAMPLE==='1';
+if(sampleResources&&process.platform!=='linux')throw Error('resource sampling requires Linux');
 const spinDir = process.env.ORESLANG_SPIN_DIR;
 const compilerDir = process.env.ORESLANG_SOURCE_DIR;
 const spinPins = spinDir && compilerDir ? {
@@ -58,7 +60,7 @@ const environment = {source_sha:sha('.'), profile, config, selected,
   node_options:process.env.NODE_OPTIONS ?? null,
   ci:process.env.GITHUB_RUN_ID ?? null, topology:'single-host loopback; client shares CPU with server',
   latency_model:'closed-loop; one outstanding request per worker; coordinated omission possible',
-  cpu_rss:'not sampled in this initial runner', ranking_eligible:false};
+  cpu_rss:sampleResources?'sampled Linux process group; raw observations, not unique memory or complete CPU accounting':'not sampled', ranking_eligible:false};
 writeFileSync(join(root,'environment.json'),JSON.stringify(environment,null,2)+'\n');
 const raw=join(root,'trials.jsonl');
 writeFileSync(raw,'',{flag:'wx'});
@@ -86,7 +88,7 @@ function signalGroup(child,signal) {
 for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>{signalGroup(active,'SIGKILL');process.exit(128+(sig==='SIGINT'?2:15));});
 let failed=false;
 for(const target of selected){
-  let child, log, spawnError;
+  let child, log, spawnError, sampler, sampleDone, sampleLog;
   try{
     if(await occupied())throw Error('port 8080 already occupied');
     log=openSync(join(root,target+'.server.log'),'wx');
@@ -104,6 +106,11 @@ for(const target of selected){
     }
     if(!ready)throw Error('readiness timeout');
     const startup_ms=performance.now()-start;
+    if(sampleResources){
+      sampleLog=openSync(join(root,target+'.resources.jsonl'),'wx');
+      sampler=spawn('python3',['scripts/resource-sample.py',String(child.pid)],{stdio:['ignore',sampleLog,log]});
+      sampleDone=new Promise(resolve=>{sampler.once('error',()=>resolve(false));sampler.once('close',code=>resolve(code===0));});
+    }
     const conformance=spawnSync('python3',['scripts/conformance.py','--target',target],{encoding:'utf8',timeout:180000});
     writeFileSync(join(root,target+'.conformance.log'),(conformance.stdout??'')+'\n'+(conformance.stderr??''));
     if(conformance.error || conformance.status!==0)throw Error('HTTP conformance failed');
@@ -130,6 +137,16 @@ for(const target of selected){
     }
   }catch(e){failed=true;appendFileSync(raw,JSON.stringify({target,status:'failed',error:String(e),valid:false})+'\n');console.error(target,e);}
   finally{
+    if(sampler){
+      sampler.kill('SIGTERM');
+      const done=await Promise.race([sampleDone,sleep(4000).then(()=>false)]);
+      if(!done){sampler.kill('SIGKILL');failed=true;console.error(target,'resource sampler failed');}
+      if(sampleLog!==undefined)closeSync(sampleLog);
+      try{
+        const samples=readFileSync(join(root,target+'.resources.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
+        if(samples[0]?.type!=='metadata'||!samples.some(s=>s.type==='sample'&&s.members?.length))throw Error('missing resource samples');
+      }catch(e){failed=true;console.error(target,e);}
+    }
     if(child){signalGroup(child,'SIGTERM');await sleep(1000);signalGroup(child,'SIGKILL');}
     active=null;if(log!==undefined)closeSync(log);
   }
