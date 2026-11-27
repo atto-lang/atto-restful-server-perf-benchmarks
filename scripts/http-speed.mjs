@@ -17,12 +17,15 @@ const targets = {
   'spin-legacy-jvm-shared': ['bash','src/oreslang/spin/run.sh','shared'],
   'spin-legacy-jvm-isolated': ['bash','src/oreslang/spin/run.sh','isolated'],
 };
+const historicalTargets=Object.keys(targets);
+for(const mode of ['shared','isolated'])for(const life of ['fresh','pooled'])targets['spin-current-jvm-'+mode+'-'+life]=['bash','src/oreslang/spin/run-current.sh',mode,life];
 const [profile, output, ...chosen] = process.argv.slice(2);
 if (!['smoke','full'].includes(profile) || !output ||
     chosen.some(x => !Object.hasOwn(targets,x)) || new Set(chosen).size !== chosen.length) {
   throw Error('usage: node scripts/http-speed.mjs smoke|full NEW_OUTPUT_DIRECTORY [target ...]');
 }
-const selected = chosen.length ? chosen : Object.keys(targets);
+const selected = chosen.length ? chosen : historicalTargets;
+if(selected.some(t=>t.startsWith('spin-current-'))&&selected.some(t=>t.startsWith('spin-legacy-')))throw Error('separate compiler pins require separate invocations');
 const config = profile === 'smoke'
   ? {warmup: 1, duration: 2, trials: 1, concurrency: [1,8], reuse: [true]}
   : {warmup: 30, duration: 60, trials: 5, concurrency: [1,8,32,128], reuse: [true,false]};
@@ -105,6 +108,14 @@ for(const target of selected){
     if(conformance.error || conformance.status!==0)throw Error('HTTP conformance failed');
     const receipt=JSON.parse(conformance.stdout.trim());
     if(receipt.passed!==true||receipt.checks!==36||receipt.failures.length||receipt.target!==target||receipt.contract_sha256!==fixtureHash)throw Error('incomplete HTTP conformance receipt');
+    if(target.startsWith('spin-current-')){
+      const proof=spawnSync('node',['scripts/check-spin-worker-reuse.mjs',target.includes('-isolated-')?'isolated':'shared',target.endsWith('-pooled')?'pooled':'fresh'],{encoding:'utf8',timeout:240000});
+      writeFileSync(join(root,target+'.worker-reuse.log'),(proof.stdout??'')+'\n'+(proof.stderr??''));
+      if(proof.error||proof.status!==0)throw Error('worker lifecycle proof failed');
+      const evidence=JSON.parse(proof.stdout.trim());
+      writeFileSync(join(root,target+'.worker-reuse.json'),JSON.stringify(evidence)+'\n');
+      console.log(JSON.stringify(evidence.summary));
+    }
     for(const s of scenarios)for(const reuse of config.reuse)for(const concurrency of config.concurrency)for(let trial=1;trial<=config.trials;trial++){
       if(child.exitCode!==null||child.signalCode!==null)throw Error('server stopped');
       const warmup=await phase(s,concurrency,config.warmup,reuse);
