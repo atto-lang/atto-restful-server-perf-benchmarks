@@ -7,10 +7,8 @@ export const targets = ['js-nodejs','golang-gin','rust-axum','erlang-otp','spin-
 export const extraReferenceTargets=['java-vertx'];
 export const comparisonTargets=['js-nodejs','golang-gin','java-vertx','rust-axum','spin-current-jvm-shared-pooled','spin-current-jvm-isolated-pooled'];
 export const currentTargets=['spin-current-jvm-shared-fresh','spin-current-jvm-shared-pooled','spin-current-jvm-isolated-fresh','spin-current-jvm-isolated-pooled'];
-export const profiles = {
-  smoke:{warmup:1,duration:2,trials:1,concurrency:[1,8],reuse:[true]},
-  full:{warmup:30,duration:60,trials:5,concurrency:[1,8,32,128],reuse:[true,false]},
-};
+import {profiles} from './http-speed-profiles.mjs';
+export {profiles};
 const scenarios=['plaintext','json','echo-1k'];
 const ensure=(ok,message)=>{if(!ok)throw Error(message);};
 const finite=x=>typeof x==='number'&&Number.isFinite(x);
@@ -33,7 +31,7 @@ export function validateReceipt(env,rows,{expectedTargets=targets,expectedSha,ex
   if(expectedContract!==undefined)ensure(env.contract_sha256===expectedContract,'contract SHA mismatch');
   ensure(Array.isArray(expectedTargets)&&expectedTargets.length>0&&new Set(expectedTargets).size===expectedTargets.length&&expectedTargets.every(t=>targets.includes(t)||extraReferenceTargets.includes(t)||currentTargets.includes(t)),'invalid expected targets');
   ensure(same(env.selected,expectedTargets),'target selection mismatch');
-  const c=profiles[env.profile];ensure(c&&same(env.config,c),'profile/config mismatch');
+  const c=Object.hasOwn(profiles,env.profile)?profiles[env.profile]:null;ensure(c&&same(env.config,c),'profile/config mismatch');
   if(expectedTargets.some(t=>t.startsWith('spin-current-')))ensure(env.spin_pins?.spin==='66662e7b8977283c357bcc7c21601547953baa49'&&env.spin_pins?.compiler==='e6098659c2e1641564bb5835b4dbb92a6a00b1a8'&&env.spin_pins?.routing==='4c28fe37178f52ebe4bd504d608ff42215f1ec48','current Spin pin mismatch');
   if(expectedTargets.some(t=>t.startsWith('spin-legacy-')))ensure(env.spin_pins?.spin==='8f29b2f75f13beb3e03357e6b15839129c33d72b'&&env.spin_pins?.compiler==='3f709fbf59abb2c13313725d2d648e6b560b17b8'&&env.spin_pins?.routing==='41b2cbff35be3cb5dca7d33fe30c3892498f9b75','historical Spin pin mismatch');
   for(const t of expectedTargets.filter(t=>currentTargets.includes(t))){

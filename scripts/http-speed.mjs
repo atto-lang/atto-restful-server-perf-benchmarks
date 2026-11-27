@@ -1,5 +1,6 @@
 // Sequential loopback HTTP benchmark. Smoke numbers are diagnostics, not rankings.
 import {request,phase} from './http-speed-client.mjs';
+import {profiles,profileConfig,timedSeconds} from './http-speed-profiles.mjs';
 import net from 'node:net';
 import {spawn, spawnSync, execFileSync} from 'node:child_process';
 import {mkdirSync, openSync, closeSync, appendFileSync, writeFileSync, readFileSync} from 'node:fs';
@@ -21,15 +22,14 @@ const historicalTargets=Object.keys(targets);
 targets['java-vertx']=['bash','src/java/vertx/run.sh'];
 for(const mode of ['shared','isolated'])for(const life of ['fresh','pooled'])targets['spin-current-jvm-'+mode+'-'+life]=['bash','src/oreslang/spin/run-current.sh',mode,life];
 const [profile, output, ...chosen] = process.argv.slice(2);
-if (!['smoke','full'].includes(profile) || !output ||
+if (!Object.hasOwn(profiles,profile) || !output ||
     chosen.some(x => !Object.hasOwn(targets,x)) || new Set(chosen).size !== chosen.length) {
-  throw Error('usage: node scripts/http-speed.mjs smoke|full NEW_OUTPUT_DIRECTORY [target ...]');
+  throw Error('usage: node scripts/http-speed.mjs smoke|steady|full NEW_OUTPUT_DIRECTORY [target ...]');
 }
 const selected = chosen.length ? chosen : historicalTargets;
 if(selected.some(t=>t.startsWith('spin-current-'))&&selected.some(t=>t.startsWith('spin-legacy-')))throw Error('separate compiler pins require separate invocations');
-const config = profile === 'smoke'
-  ? {warmup: 1, duration: 2, trials: 1, concurrency: [1,8], reuse: [true]}
-  : {warmup: 30, duration: 60, trials: 5, concurrency: [1,8,32,128], reuse: [true,false]};
+const config = profileConfig(profile);
+console.error('Minimum timed seconds: '+timedSeconds(profile,selected.length));
 if (process.platform !== 'linux' && process.platform !== 'darwin') throw Error('POSIX process groups required');
 const dirty = execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).trim();
 if (dirty) throw Error('tracked benchmark source differs from HEAD');

@@ -1,0 +1,73 @@
+name: GraalVM steady five-language diagnostic
+on:
+  push:
+    branches: ['feat/graal-steady-five-language-20261127']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  graal-steady:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173
+        with:
+          version: '25.3'
+          java-version: '25'
+          distribution: 'graalvm'
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.25'
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+      - name: Record Graal toolchain identity
+        run: |
+          java -version 2>&1 | tee "$RUNNER_TEMP/graal-version.txt"
+          grep -i graalvm "$RUNNER_TEMP/graal-version.txt"
+          native-image --version
+      - name: Build reference servers on the same JDK and host
+        run: |
+          set -euxo pipefail
+          (cd src/golang/gin && go build -mod=readonly -o server .)
+          (cd src/rust/axum && cargo build --release --locked)
+          (cd src/java/vertx && mvn -B -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
+          (cd src/java/vertx && mvn -B -q dependency:tree -DoutputFile=dependency-tree.lock)
+          git diff --exit-code -- src/golang/gin/go.mod src/golang/gin/go.sum src/rust/axum/Cargo.lock src/java/vertx/dependency-tree.lock
+      - name: Build exact current Spin dependencies
+        run: |
+          set -euxo pipefail
+          git clone --no-checkout https://github.com/atto-lang/atto-spin.git "$RUNNER_TEMP/spin"
+          git -C "$RUNNER_TEMP/spin" checkout --detach 66662e7b8977283c357bcc7c21601547953baa49
+          git clone --no-checkout https://github.com/atto-lang/atto-http-routing.git "$RUNNER_TEMP/spin/dependencies/http-routing"
+          git -C "$RUNNER_TEMP/spin/dependencies/http-routing" checkout --detach 4c28fe37178f52ebe4bd504d608ff42215f1ec48
+          git clone --no-checkout https://github.com/atto-lang/atto-source.java.git "$RUNNER_TEMP/compiler"
+          git -C "$RUNNER_TEMP/compiler" checkout --detach e6098659c2e1641564bb5835b4dbb92a6a00b1a8
+          (cd "$RUNNER_TEMP/compiler" && mvn -B -q -DskipTests clean package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
+          python3 -m pip install --user jsonschema==4.25.1
+          ORESLANG_SOURCE_DIR="$RUNNER_TEMP/compiler" bash "$RUNNER_TEMP/spin/scripts/check-pins.sh"
+      - name: Host regressions
+        run: |
+          node --test scripts/test-http-speed-profiles.mjs
+          bash -n src/oreslang/spin/run-current.sh
+          node --test src/oreslang/spin/test-stage-current.mjs
+          node --check scripts/check-spin-worker-reuse.mjs
+          node --test scripts/test-http-speed-client.mjs scripts/test-http-speed-receipt.mjs scripts/test-spin-worker-proof.mjs scripts/test-spin-worker-http.mjs scripts/test-spin-lifecycle-receipt.mjs
+      - name: Same-host GraalVM steady diagnostic (not ranking evidence)
+        run: |
+          export ORESLANG_SPIN_DIR="$RUNNER_TEMP/spin"
+          export ORESLANG_SOURCE_DIR="$RUNNER_TEMP/compiler"
+          targets=(js-nodejs golang-gin java-vertx rust-axum spin-current-jvm-shared-pooled spin-current-jvm-isolated-pooled)
+          node scripts/http-speed.mjs steady results/graal-steady "${targets[@]}"
+          node scripts/http-speed-receipt.mjs results/graal-steady "$(git rev-parse HEAD)" "$(sha256sum contracts/conformance/cases.json | cut -d' ' -f1)" "${targets[@]}"
+      - name: Preserve receipts even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: graal-steady
+          path: results/graal-steady/
+          if-no-files-found: warn
