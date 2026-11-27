@@ -9,6 +9,7 @@ on:
       - 'scripts/check-spin-worker-reuse.mjs'
       - 'scripts/spin-worker-proof.mjs'
       - 'scripts/test-spin-worker-proof.mjs'
+      - 'scripts/test-spin-worker-http.mjs'
       - '.github/workflows/spin-current-lifecycle.yml'
       - 'scripts/http-speed*.mjs'
   workflow_dispatch:
@@ -45,7 +46,7 @@ jobs:
         run: |
           bash -n src/oreslang/spin/run-current.sh
           node --check scripts/check-spin-worker-reuse.mjs
-          node --test scripts/test-http-speed-client.mjs scripts/test-http-speed-receipt.mjs scripts/test-spin-worker-proof.mjs
+          node --test scripts/test-http-speed-client.mjs scripts/test-http-speed-receipt.mjs scripts/test-spin-worker-proof.mjs scripts/test-spin-worker-http.mjs
       - name: Same-pin paired lifecycle smoke (not ranking evidence)
         run: |
           export ORESLANG_SPIN_DIR="$RUNNER_TEMP/spin"
